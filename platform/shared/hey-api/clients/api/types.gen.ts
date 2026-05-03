@@ -31696,6 +31696,9 @@ export type CreateLlmProviderApiKeyData = {
         isPrimary?: boolean;
         vaultSecretPath?: string;
         vaultSecretKey?: string;
+        awsAccessKeyId?: string;
+        awsSecretAccessKey?: string;
+        awsSessionToken?: string;
     };
     path?: never;
     query?: never;
@@ -32106,6 +32109,9 @@ export type UpdateLlmProviderApiKeyData = {
         isPrimary?: boolean;
         vaultSecretPath?: string;
         vaultSecretKey?: string;
+        awsAccessKeyId?: string;
+        awsSecretAccessKey?: string;
+        awsSessionToken?: string;
     };
     path: {
         id: string;
