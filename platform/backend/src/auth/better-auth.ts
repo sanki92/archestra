@@ -159,9 +159,15 @@ export const auth = betterAuth({
       },
       permissions: {
         /**
-         * Better Auth stores broad key permissions so API key sessions can be
-         * established. Route authorization still checks the API key owner's
-         * current RBAC permissions in hasPermission.
+         * Better Auth applies these defaults to new API keys and uses them
+         * when `verifyApiKey` is called with a `permissions` body. Archestra
+         * route authorization does not rely on the stored key permissions;
+         * API-key requests are checked against the key owner's current RBAC
+         * permissions in hasPermission.
+         *
+         * Docs:
+         * - https://better-auth.com/docs/plugins/api-key/reference#permissions
+         * - https://better-auth.com/docs/plugins/api-key/advanced#sessions-from-api-keys
          */
         defaultPermissions: allAvailableActions,
       },
