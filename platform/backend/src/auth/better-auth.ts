@@ -159,10 +159,9 @@ export const auth = betterAuth({
       },
       permissions: {
         /**
-         * NOTE: for now we will just grant all permissions to all API keys
-         *
-         * If we'd like to allow granting "scopes" to API keys, we will need to implement a more complex API-key
-         * permissions system/UI
+         * Better Auth stores broad key permissions so API key sessions can be
+         * established. Route authorization still checks the API key owner's
+         * current RBAC permissions in hasPermission.
          */
         defaultPermissions: allAvailableActions,
       },

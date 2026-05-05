@@ -45,16 +45,29 @@ export const hasPermission = async (
           body: { key: authHeader },
         });
         if (apiKeyResult?.valid && apiKeyResult.key?.referenceId) {
+          const apiKeyUserId = apiKeyResult.key.referenceId;
           logger.trace(
-            { apiKeyUserId: apiKeyResult.key.referenceId },
+            { apiKeyUserId },
             "[hasPermission] Valid API key found, checking owner permissions",
           );
 
-          const hasAllPermissions = await checkUserPermissions({
-            userId: apiKeyResult.key.referenceId,
-            organizationId: apiKeyResult.key.metadata?.organizationId ?? "",
+          const apiKeyOwner = await UserModel.getById(apiKeyUserId);
+          const organizationId = apiKeyOwner?.organizationId;
+          if (!organizationId) {
+            logger.trace(
+              "[hasPermission] API key missing organization context",
+            );
+            return { success: false, error: new Error("Forbidden") };
+          }
+
+          const userPermissions = await UserModel.getUserPermissions(
+            apiKeyUserId,
+            organizationId,
+          );
+          const hasAllPermissions = hasRequiredPermissions(
+            userPermissions,
             permissions,
-          });
+          );
 
           return {
             success: hasAllPermissions,
@@ -93,34 +106,17 @@ export const userHasPermission = async (
   return permissions[resource]?.includes(action) ?? false;
 };
 
-const checkUserPermissions = async (params: {
-  userId: string;
-  organizationId: string;
-  permissions: Permissions;
-}): Promise<boolean> => {
-  const { userId, organizationId, permissions } = params;
-
-  if (!organizationId) {
-    logger.trace("[hasPermission] API key missing organization context");
-    return false;
-  }
-
-  const permissionEntries = Object.entries(permissions);
-
-  for (const [resource, actions] of permissionEntries) {
+function hasRequiredPermissions(
+  userPermissions: Permissions,
+  requiredPermissions: Permissions,
+): boolean {
+  for (const [resource, actions] of Object.entries(requiredPermissions)) {
     for (const action of actions) {
-      const hasAccess = await userHasPermission(
-        userId,
-        organizationId,
-        resource as Resource,
-        action as Action,
-      );
-
-      if (!hasAccess) {
+      if (!userPermissions[resource as Resource]?.includes(action as Action)) {
         return false;
       }
     }
   }
 
   return true;
-};
+}

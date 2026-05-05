@@ -13,6 +13,7 @@ import { hasPermission } from "./utils";
 
 vi.mock("@/models", () => ({
   UserModel: {
+    getById: vi.fn(),
     getUserPermissions: vi.fn(),
   },
 }));
@@ -30,6 +31,7 @@ import { auth as betterAuth } from "./better-auth";
 
 // Type the mocked functions
 const mockUserModel = UserModel as unknown as {
+  getById: MockedFunction<typeof UserModel.getById>;
   getUserPermissions: MockedFunction<typeof UserModel.getUserPermissions>;
 };
 
@@ -45,6 +47,21 @@ type ApiKey = Awaited<ReturnType<typeof betterAuth.api.verifyApiKey>>["key"];
 describe("hasPermission", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUserModel.getById.mockResolvedValue({
+      id: "user1",
+      name: "Test User",
+      email: "user1@test.com",
+      emailVerified: true,
+      image: null,
+      role: null,
+      banned: null,
+      banReason: null,
+      banExpires: null,
+      twoFactorEnabled: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      organizationId: "org-1",
+    });
     mockUserModel.getUserPermissions.mockResolvedValue({
       agent: ["read", "create", "update", "delete", "admin"],
       mcpServerInstallation: ["admin"],
@@ -115,13 +132,18 @@ describe("hasPermission", () => {
         error: null,
         key: makeApiKey({
           referenceId: "user1",
-          metadata: { organizationId: "org-1" },
+          metadata: null,
         }),
       });
 
       const result = await hasPermission(permissions, headers);
 
       expect(result).toEqual({ success: true, error: null });
+      expect(mockUserModel.getById).toHaveBeenCalledWith("user1");
+      expect(mockUserModel.getUserPermissions).toHaveBeenCalledWith(
+        "user1",
+        "org-1",
+      );
       expect(mockBetterAuth.api.verifyApiKey).toHaveBeenCalledWith({
         body: { key: "Bearer api-key-123" },
       });
@@ -141,7 +163,7 @@ describe("hasPermission", () => {
         error: null,
         key: makeApiKey({
           referenceId: "user-limited",
-          metadata: { organizationId: "org-1" },
+          metadata: null,
         }),
       });
       mockUserModel.getUserPermissions.mockResolvedValue({
@@ -272,13 +294,14 @@ describe("hasPermission", () => {
         error: null,
         key: makeApiKey({
           referenceId: "user1",
-          metadata: { organizationId: "org-1" },
+          metadata: null,
         }),
       });
 
       const result = await hasPermission(permissions, headers);
 
       expect(result).toEqual({ success: true, error: null });
+      expect(mockUserModel.getUserPermissions).toHaveBeenCalledTimes(1);
       expect(mockBetterAuth.api.verifyApiKey).toHaveBeenCalledWith({
         body: { key: "Bearer api-key-complex" },
       });
@@ -308,7 +331,7 @@ describe("hasPermission", () => {
           error: null,
           key: makeApiKey({
             referenceId: "user1",
-            metadata: { organizationId: "org-1" },
+            metadata: null,
           }),
         });
 
