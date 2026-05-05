@@ -209,7 +209,8 @@ export const catalogItems: CatalogItem[] = [
         type: "secret",
         required: true,
         source: "prompt-install",
-        description: "Jira API token (id.atlassian.com/manage-profile/security/api-tokens)",
+        description:
+          "Jira API token (id.atlassian.com/manage-profile/security/api-tokens)",
       },
     ],
     mappings: [

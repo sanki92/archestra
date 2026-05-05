@@ -1,7 +1,7 @@
 import { type APIRequestContext, expect, type Page } from "@playwright/test";
 import { archestraApiSdk } from "@shared";
 import { testMcpServerCommand } from "@shared/test-mcp-server";
-import { E2eTestId, getE2eRequestUrl, UI_BASE_URL } from "../consts";
+import { getE2eRequestUrl, UI_BASE_URL } from "../consts";
 import { goToPage } from "../fixtures";
 
 export async function addCustomSelfHostedCatalogItem({
@@ -48,48 +48,26 @@ export async function addCustomSelfHostedCatalogItem({
     .getByRole("textbox", { name: "Arguments (one per line)" })
     .fill(`-c\n${singleLineCommand}`);
   if (envVars) {
-    await createDialog.getByRole("button", { name: "Add Variable" }).click();
-    await createDialog
-      .getByRole("textbox", { name: "API_KEY" })
-      .fill(envVars.key);
-    if (envVars.isSecret) {
-      await createDialog
-        .getByTestId(E2eTestId.SelectEnvironmentVariableType)
-        .click();
-      await page.getByRole("option", { name: "Secret" }).click();
+    if (envVars.vaultSecret) {
+      throw new Error(
+        "vaultSecret env var setup is not yet supported in the refactored Add field dialog",
+      );
     }
-    if (envVars.promptOnInstallation) {
-      await createDialog
-        .getByTestId(E2eTestId.PromptOnInstallationCheckbox)
+    await createDialog.getByRole("button", { name: "Add field" }).click();
+    const fieldDialog = page.getByRole("dialog", { name: /Add field/i });
+    await expect(fieldDialog).toBeVisible({ timeout: 15_000 });
+    await fieldDialog.getByLabel("Key").fill(envVars.key);
+    if (envVars.isSecret) {
+      await fieldDialog.getByLabel("Type").click();
+      await page.getByRole("option", { name: "secret" }).click();
+    }
+    if (!envVars.promptOnInstallation) {
+      await fieldDialog
+        .getByRole("radio", { name: /Static/i })
         .click({ force: true });
     }
-    if (envVars.vaultSecret) {
-      await createDialog.getByText("Set Secret").click();
-      const externalSecretDialog = page.getByRole("dialog", {
-        name: /Set external secret/i,
-      });
-      await expect(externalSecretDialog).toBeVisible({ timeout: 15_000 });
-      await externalSecretDialog
-        .getByTestId(E2eTestId.ExternalSecretSelectorTeamTrigger)
-        .click();
-      await page
-        .getByRole("option", { name: envVars.vaultSecret.teamName })
-        .click();
-      await externalSecretDialog
-        .getByTestId(E2eTestId.ExternalSecretSelectorSecretTrigger)
-        .click();
-      await page
-        .getByRole("option", { name: envVars.vaultSecret.name })
-        .click();
-      await externalSecretDialog
-        .getByTestId(E2eTestId.ExternalSecretSelectorSecretTriggerKey)
-        .click();
-      await page.getByRole("option", { name: envVars.vaultSecret.key }).click();
-      await externalSecretDialog
-        .getByRole("button", { name: "Confirm" })
-        .click();
-      await expect(externalSecretDialog).not.toBeVisible({ timeout: 15_000 });
-    }
+    await fieldDialog.getByRole("button", { name: "Add field" }).click();
+    await expect(fieldDialog).not.toBeVisible({ timeout: 15_000 });
   }
   if (scope && scope !== "personal") {
     await createDialog

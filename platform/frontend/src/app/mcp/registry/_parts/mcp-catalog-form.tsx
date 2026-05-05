@@ -31,9 +31,7 @@ import {
   type EnterpriseManagedConfigInput,
   EnterpriseManagedCredentialFields,
 } from "@/components/enterprise-managed-credential-fields";
-import { EnvironmentVariablesFormField } from "@/components/environment-variables-form-field";
 import { ExternalDocsLink } from "@/components/external-docs-link";
-import { InstallConfigFieldsTable } from "@/components/install-config-fields-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -90,6 +88,7 @@ import {
 } from "@/lib/mcp/mcp-form-autocomplete";
 import { useGetSecret } from "@/lib/secrets.query";
 import { useTeams } from "@/lib/teams/team.query";
+import { FieldsAndMappingsSection } from "./fields-and-mappings-section";
 import {
   formSchema,
   type McpCatalogFormValues,
@@ -151,18 +150,6 @@ export function McpCatalogForm({
       : null;
   // Fetch local config secrets only for local MCP catalog items.
   const { data: localConfigSecret } = useGetSecret(localConfigSecretId);
-
-  // Pre-existing secret env-var keys, used to render a `••••••••` placeholder.
-  const storedSecretKeys = useMemo(() => {
-    if (initialValues?.serverType !== "local" || !initialValues.localConfig) {
-      return new Set<string>();
-    }
-    return new Set(
-      (initialValues.localConfig.environment ?? [])
-        .filter((env) => env.type === "secret")
-        .map((env) => env.key),
-    );
-  }, [initialValues]);
 
   // Get MCP server base image from backend features endpoint
   const mcpServerBaseImage = useFeature("mcpServerBaseImage") ?? "";
@@ -550,7 +537,12 @@ export function McpCatalogForm({
   const showByosOption = useFeature("byosEnabled");
 
   // Use field array for environment variables
-  const { fields, append, remove } = useFieldArray({
+  const {
+    fields,
+    append,
+    remove,
+    update: updateEnvVar,
+  } = useFieldArray({
     control: form.control,
     name: "localConfig.environment",
   });
@@ -580,6 +572,7 @@ export function McpCatalogForm({
     fields: additionalHeaderFields,
     append: appendAdditionalHeader,
     remove: removeAdditionalHeader,
+    update: updateAdditionalHeader,
   } = useFieldArray({
     control: form.control,
     name: "additionalHeaders",
@@ -1112,28 +1105,96 @@ export function McpCatalogForm({
 
             {currentServerType === "local" && (
               <div className="space-y-4">
-                <EnvironmentVariablesFormField
-                  control={form.control}
-                  fields={fields}
-                  append={append}
-                  remove={remove}
-                  fieldNamePrefix="localConfig.environment"
-                  form={form}
-                  useExternalSecretsManager={showByosOption}
-                  secretKeysWithStoredValue={storedSecretKeys}
-                  disablePromptOnInstallation={isMultitenant}
-                  disablePromptOnInstallationReason="Multi-tenant servers share one deployment, so env vars are set once at deploy time and cannot be prompted per install."
-                  labelSuffix={<ReinstallHint show={isEnvDirty} />}
-                  envFrom={{
-                    fields: envFromFields,
-                    append: appendEnvFrom,
-                    remove: removeEnvFrom,
-                    watch: form.watch,
-                    setValue: form.setValue,
-                    register: form.register,
-                    fieldNamePrefix: "localConfig.envFrom",
-                  }}
-                />
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-base">
+                    Environment From k8s Secrets / ConfigMaps
+                    <ReinstallHint show={isEnvDirty} />
+                  </h3>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      appendEnvFrom({
+                        type: "secret",
+                        name: "",
+                        prefix: "",
+                      })
+                    }
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Source
+                  </Button>
+                </div>
+                {envFromFields.length === 0 ? (
+                  <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                    No sources configured.
+                  </div>
+                ) : (
+                  <FormDescription className="text-xs">
+                    Inject all keys from existing k8s Secrets or ConfigMaps as
+                    environment variables.
+                  </FormDescription>
+                )}
+                {envFromFields.map((field, index) => (
+                  <div
+                    key={field.id}
+                    className="border rounded-lg p-3 space-y-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <Select
+                        value={form.watch(`localConfig.envFrom.${index}.type`)}
+                        onValueChange={(val) =>
+                          form.setValue(
+                            `localConfig.envFrom.${index}.type`,
+                            val as "secret" | "configMap",
+                            { shouldDirty: true },
+                          )
+                        }
+                      >
+                        <SelectTrigger className="w-[200px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="secret">Secret</SelectItem>
+                          <SelectItem value="configMap">ConfigMap</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeEnvFrom(index)}
+                      >
+                        <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">
+                          Name <span className="text-destructive">*</span>
+                        </Label>
+                        <Input
+                          placeholder="my-k8s-secret"
+                          className="font-mono"
+                          {...form.register(
+                            `localConfig.envFrom.${index}.name`,
+                          )}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Prefix (optional)</Label>
+                        <Input
+                          placeholder="e.g. MY_PREFIX_"
+                          className="font-mono"
+                          {...form.register(
+                            `localConfig.envFrom.${index}.prefix`,
+                          )}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -2021,66 +2082,31 @@ export function McpCatalogForm({
               </div>
             )}
 
-            {(currentServerType === "remote" ||
-              (currentServerType === "local" &&
-                currentTransportType === "streamable-http")) && <Separator />}
-            {(currentServerType === "remote" ||
-              (currentServerType === "local" &&
-                currentTransportType === "streamable-http")) && (
-              <div className="space-y-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <h3 className="font-semibold text-base">
-                      Headers
-                      <ReinstallHint show={isHeadersDirty} />
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      Sent on every request — for tenant IDs, regions, or other
-                      upstream metadata.
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      appendAdditionalHeader({
-                        fieldName: undefined,
-                        headerName: "",
-                        promptOnInstallation: true,
-                        required: false,
-                        value: "",
-                        description: "",
-                        includeBearerPrefix: false,
-                      })
-                    }
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Header
-                  </Button>
-                </div>
-
-                {additionalHeaderFields.length === 0 ? (
-                  <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                    No headers configured.
-                  </div>
-                ) : (
-                  <InstallConfigFieldsTable
-                    control={form.control}
-                    form={form}
-                    fields={additionalHeaderFields}
-                    remove={removeAdditionalHeader}
-                    fieldNamePrefix="additionalHeaders"
-                    keyFieldName="headerName"
-                    keyLabel="Header Name"
-                    keyPlaceholder="x-api-key"
-                    typeFieldName={null}
-                    valuePlaceholder="header value"
-                    bearerPrefixFieldName="includeBearerPrefix"
-                  />
-                )}
-              </div>
-            )}
+            <Separator />
+            <FieldsAndMappingsSection
+              control={form.control}
+              form={form}
+              envVars={{
+                fields,
+                append,
+                remove,
+                update: updateEnvVar,
+              }}
+              headers={{
+                fields: additionalHeaderFields,
+                append: appendAdditionalHeader,
+                remove: removeAdditionalHeader,
+                update: updateAdditionalHeader,
+              }}
+              allowLocalTargets={currentServerType === "local"}
+              allowHeaderTarget={
+                currentServerType === "remote" ||
+                (currentServerType === "local" &&
+                  currentTransportType === "streamable-http")
+              }
+              disablePromptOnInstallation={isMultitenant}
+              disablePromptOnInstallationReason="Multi-tenant servers share one deployment, so values are set once at deploy time and cannot be prompted per install."
+            />
 
             <Separator />
             <div className={embedded ? "mb-4" : ""}>
