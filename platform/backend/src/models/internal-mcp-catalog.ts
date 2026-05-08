@@ -63,14 +63,28 @@ class InternalMcpCatalogModel {
     expandSecrets?: boolean;
     userId?: string;
     isAdmin?: boolean;
+    organizationId?: string;
   }): Promise<InternalMcpCatalog[]> {
-    const { expandSecrets = true, userId, isAdmin } = options ?? {};
+    const {
+      expandSecrets = true,
+      userId,
+      isAdmin,
+      organizationId,
+    } = options ?? {};
 
     let dbItems: Array<typeof schema.internalMcpCatalogTable.$inferSelect>;
 
-    if (userId && !isAdmin) {
+    if (userId && !isAdmin && !organizationId) {
+      return [];
+    }
+
+    if (userId && organizationId) {
       const accessibleIds =
-        await McpCatalogTeamModel.getUserAccessibleCatalogIds(userId, false);
+        await McpCatalogTeamModel.getUserAccessibleCatalogIds(
+          userId,
+          !!isAdmin,
+          organizationId,
+        );
       if (accessibleIds.length === 0) return [];
       dbItems = await db
         .select()
@@ -102,9 +116,15 @@ class InternalMcpCatalogModel {
       expandSecrets?: boolean;
       userId?: string;
       isAdmin?: boolean;
+      organizationId?: string;
     },
   ): Promise<InternalMcpCatalog[]> {
-    const { expandSecrets = true, userId, isAdmin } = options ?? {};
+    const {
+      expandSecrets = true,
+      userId,
+      isAdmin,
+      organizationId,
+    } = options ?? {};
 
     let dbItems: Array<typeof schema.internalMcpCatalogTable.$inferSelect>;
 
@@ -113,9 +133,17 @@ class InternalMcpCatalogModel {
       ilike(schema.internalMcpCatalogTable.description, `%${query}%`),
     );
 
-    if (userId && !isAdmin) {
+    if (userId && !isAdmin && !organizationId) {
+      return [];
+    }
+
+    if (userId && organizationId) {
       const accessibleIds =
-        await McpCatalogTeamModel.getUserAccessibleCatalogIds(userId, false);
+        await McpCatalogTeamModel.getUserAccessibleCatalogIds(
+          userId,
+          !!isAdmin,
+          organizationId,
+        );
       if (accessibleIds.length === 0) return [];
       dbItems = await db
         .select()
@@ -151,15 +179,26 @@ class InternalMcpCatalogModel {
       expandSecrets?: boolean;
       userId?: string;
       isAdmin?: boolean;
+      organizationId?: string;
     },
   ): Promise<InternalMcpCatalog | null> {
-    const { expandSecrets = true, userId, isAdmin } = options ?? {};
+    const {
+      expandSecrets = true,
+      userId,
+      isAdmin,
+      organizationId,
+    } = options ?? {};
 
-    if (userId && !isAdmin) {
+    if (userId && !isAdmin && !organizationId) {
+      return null;
+    }
+
+    if (userId && organizationId) {
       const hasAccess = await McpCatalogTeamModel.userHasCatalogAccess(
         userId,
         id,
-        false,
+        !!isAdmin,
+        organizationId,
       );
       if (!hasAccess) return null;
     }
@@ -240,11 +279,24 @@ class InternalMcpCatalogModel {
     return result;
   }
 
-  static async findByName(name: string): Promise<InternalMcpCatalog | null> {
+  static async findByName(
+    name: string,
+    options?: { organizationId?: string },
+  ): Promise<InternalMcpCatalog | null> {
+    const whereCondition = options?.organizationId
+      ? and(
+          eq(schema.internalMcpCatalogTable.name, name),
+          eq(
+            schema.internalMcpCatalogTable.organizationId,
+            options.organizationId,
+          ),
+        )
+      : eq(schema.internalMcpCatalogTable.name, name);
+
     const [dbItem] = await db
       .select()
       .from(schema.internalMcpCatalogTable)
-      .where(eq(schema.internalMcpCatalogTable.name, name));
+      .where(whereCondition);
 
     if (!dbItem) {
       return null;
