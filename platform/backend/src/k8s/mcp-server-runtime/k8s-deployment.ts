@@ -329,6 +329,7 @@ export default class K8sDeployment {
 
     this.catalogItem = await InternalMcpCatalogModel.findById(
       this.mcpServer.catalogId,
+      { includeMetadata: false },
     );
     return this.catalogItem;
   }

@@ -625,6 +625,7 @@ async function handleGetMcpServerTools(
       args.mcpServerId,
       {
         expandSecrets: false,
+        includeMetadata: false,
         userId: context.userId,
         isAdmin,
         organizationId,
@@ -668,6 +669,7 @@ async function handleEditMcpDescription(
       userId: context.userId,
       isAdmin,
       organizationId,
+      includeMetadata: false,
     });
     if (!existing) {
       return errorResult("MCP server not found.");
@@ -769,6 +771,7 @@ async function handleEditMcpConfig(
       userId: context.userId,
       isAdmin,
       organizationId,
+      includeMetadata: false,
     });
     if (!existing) {
       return errorResult("MCP server not found.");
@@ -1030,6 +1033,7 @@ async function handleDeployMcpServer(
       userId: context.userId,
       isAdmin,
       organizationId,
+      includeMetadata: false,
     });
     if (!catalogItem) {
       return errorResult("catalog item not found.");

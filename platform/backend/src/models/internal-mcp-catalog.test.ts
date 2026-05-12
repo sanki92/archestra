@@ -326,7 +326,7 @@ describe("InternalMcpCatalogModel", () => {
       expect(found?.labels[0].value).toBe("prod");
     });
 
-    test("findByIdWithResolvedSecrets returns labels", async () => {
+    test("findByIdWithResolvedSecrets skips labels (runtime-only path)", async () => {
       const catalog = await InternalMcpCatalogModel.create({
         name: "catalog-resolved-secrets-labels",
         serverType: "remote",
@@ -338,9 +338,10 @@ describe("InternalMcpCatalogModel", () => {
       );
 
       expect(found).not.toBeNull();
-      expect(found?.labels).toHaveLength(1);
-      expect(found?.labels[0].key).toBe("scope");
-      expect(found?.labels[0].value).toBe("internal");
+      // Runtime-only method does not load labels/teams to avoid satellite
+      // queries on hot paths (MCP gateway, server runtime).
+      expect(found?.labels).toEqual([]);
+      expect(found?.teams).toEqual([]);
     });
 
     test("findByName returns labels", async () => {

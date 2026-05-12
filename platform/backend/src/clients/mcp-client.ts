@@ -1124,7 +1124,9 @@ class McpClient {
     }
 
     // Get catalog item
-    const catalogItem = await InternalMcpCatalogModel.findById(tool.catalogId);
+    const catalogItem = await InternalMcpCatalogModel.findById(tool.catalogId, {
+      includeMetadata: false,
+    });
     if (!catalogItem) {
       return {
         error: await this.createErrorResult(
@@ -2811,7 +2813,9 @@ class McpClient {
 
     if (matchingTools.length > 0 && matchingTools[0].catalogId) {
       const catalogId = matchingTools[0].catalogId;
-      const catalogItem = await InternalMcpCatalogModel.findById(catalogId);
+      const catalogItem = await InternalMcpCatalogModel.findById(catalogId, {
+        includeMetadata: false,
+      });
       if (catalogItem) {
         const servers = await McpServerModel.findByCatalogId(catalogId);
         const server = servers[0];
@@ -2933,7 +2937,9 @@ class McpClient {
 
     for (const catalogId of catalogIds) {
       try {
-        const catalogItem = await InternalMcpCatalogModel.findById(catalogId);
+        const catalogItem = await InternalMcpCatalogModel.findById(catalogId, {
+          includeMetadata: false,
+        });
         if (!catalogItem) continue;
 
         const servers = await McpServerModel.findByCatalogId(catalogId);

@@ -123,6 +123,7 @@ export class PolicyConfigurationService {
       if (tool.catalogId) {
         const catalog = await InternalMcpCatalogModel.findById(tool.catalogId, {
           expandSecrets: false,
+          includeMetadata: false,
         });
         mcpServerName = catalog?.name ?? null;
       }

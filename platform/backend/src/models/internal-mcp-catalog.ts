@@ -186,6 +186,14 @@ class InternalMcpCatalogModel {
       userId?: string;
       isAdmin?: boolean;
       organizationId?: string;
+      /**
+       * Load labels and teams alongside the catalog row. Defaults to true for
+       * API/UI callers. Runtime callers (MCP client, gateway, k8s runtime)
+       * that only need the catalog config should pass `false` — each load
+       * triggers two extra DB round-trips and is amplified by per-catalog
+       * fan-out loops.
+       */
+      includeMetadata?: boolean;
     },
   ): Promise<InternalMcpCatalog | null> {
     const {
@@ -193,6 +201,7 @@ class InternalMcpCatalogModel {
       userId,
       isAdmin,
       organizationId,
+      includeMetadata = true,
     } = options ?? {};
 
     if (userId && !isAdmin && !organizationId) {
@@ -218,8 +227,12 @@ class InternalMcpCatalogModel {
       return null;
     }
 
-    const labels = await McpCatalogLabelModel.getLabelsForCatalogItem(id);
-    const teams = await McpCatalogTeamModel.getTeamDetailsForCatalog(id);
+    const [labels, teams] = includeMetadata
+      ? await Promise.all([
+          McpCatalogLabelModel.getLabelsForCatalogItem(id),
+          McpCatalogTeamModel.getTeamDetailsForCatalog(id),
+        ])
+      : [[], []];
     const catalogItem: InternalMcpCatalog = {
       ...dbItem,
       labels,
@@ -238,6 +251,9 @@ class InternalMcpCatalogModel {
   /**
    * Find catalog item by ID with all secrets resolved to actual values.
    * Use this for runtime flows (OAuth, MCP server startup).
+   *
+   * Runtime callers don't read labels/teams on the returned object, so we
+   * skip those satellite queries unconditionally here.
    */
   static async findByIdWithResolvedSecrets(
     id: string,
@@ -251,12 +267,10 @@ class InternalMcpCatalogModel {
       return null;
     }
 
-    const labels = await McpCatalogLabelModel.getLabelsForCatalogItem(id);
-    const teams = await McpCatalogTeamModel.getTeamDetailsForCatalog(id);
     const catalogItem: InternalMcpCatalog = {
       ...dbItem,
-      labels,
-      teams,
+      labels: [],
+      teams: [],
     };
 
     await InternalMcpCatalogModel.expandSecretsAndAlwaysResolveValues([

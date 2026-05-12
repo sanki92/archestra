@@ -567,7 +567,10 @@ class McpServerModel {
     // Get catalog information if this server was installed from a catalog
     let catalogItem = null;
     if (mcpServer.catalogId) {
-      catalogItem = await InternalMcpCatalogModel.findById(mcpServer.catalogId);
+      catalogItem = await InternalMcpCatalogModel.findById(
+        mcpServer.catalogId,
+        { includeMetadata: false },
+      );
     }
 
     if (!catalogItem) {
@@ -738,7 +741,9 @@ class McpServerModel {
     // Check if we can connect using catalog info
     if (catalogId) {
       try {
-        const catalogItem = await InternalMcpCatalogModel.findById(catalogId);
+        const catalogItem = await InternalMcpCatalogModel.findById(catalogId, {
+          includeMetadata: false,
+        });
 
         if (catalogItem?.serverType === "remote") {
           // Use a temporary ID for validation (we don't have a real server ID yet)

@@ -104,6 +104,7 @@ export class McpServerRuntimeManager {
         if (server.catalogId) {
           const catalogItem = await InternalMcpCatalogModel.findById(
             server.catalogId,
+            { includeMetadata: false },
           );
           if (catalogItem?.serverType === "local") {
             localServers.push(server);
@@ -205,6 +206,7 @@ export class McpServerRuntimeManager {
       if (mcpServer.catalogId) {
         catalogItem = await InternalMcpCatalogModel.findById(
           mcpServer.catalogId,
+          { includeMetadata: false },
         );
       }
 
@@ -399,6 +401,7 @@ export class McpServerRuntimeManager {
 
     const catalogItem = await InternalMcpCatalogModel.findById(
       mcpServer.catalogId,
+      { includeMetadata: false },
     );
     if (!catalogItem?.multitenant) return false;
 
@@ -449,6 +452,7 @@ export class McpServerRuntimeManager {
 
       const catalogItem = await InternalMcpCatalogModel.findById(
         mcpServer.catalogId,
+        { includeMetadata: false },
       );
       if (!catalogItem || catalogItem.serverType !== "local") {
         logger.debug(
@@ -939,7 +943,9 @@ export class McpServerRuntimeManager {
       if (catalogCache.has(catalogId)) {
         return catalogCache.get(catalogId) ?? null;
       }
-      const catalog = await InternalMcpCatalogModel.findById(catalogId);
+      const catalog = await InternalMcpCatalogModel.findById(catalogId, {
+        includeMetadata: false,
+      });
       catalogCache.set(catalogId, catalog);
       return catalog;
     };
