@@ -292,6 +292,7 @@ To unblock real contributors without re-opening the floodgates, sign in via GitH
 - @heocoi
 - @daiquydev
 - @BrodoB
+- @thejoshuasilverstone-cloud
 - @sus689
 - @didier-brown
 - @diegousdz
@@ -313,3 +314,14 @@ To unblock real contributors without re-opening the floodgates, sign in via GitH
 - @CyberSarvesh
 - @itsbryanman
 - @im-shafiqurrehman
+- @mitochondria-7
+- @Amaaz28
+- @Deepam02
+- @harxhist
+- @artabr
+- @dball1126
+- @baibaozhuanyong
+- @jasonkurniawantangguh-coder
+- @devroy10
+- @yqx07
+- @hala-el
