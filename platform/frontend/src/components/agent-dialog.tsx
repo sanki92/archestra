@@ -25,12 +25,14 @@ import {
 import {
   AlertTriangle,
   Bot,
+  Braces,
   Building2,
   CheckIcon,
   ChevronDown,
   ChevronRight,
   Globe,
   Key,
+  LayoutList,
   Loader2,
   Plus,
   RotateCcw,
@@ -42,6 +44,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ConnectorTypeIcon } from "@/app/knowledge/knowledge-bases/_parts/connector-icons";
 import { AgentBadge } from "@/components/agent-badge";
+import {
+  AGENT_JSON_MODEL_PATH,
+  AGENT_JSON_SCHEMA,
+  type AgentJsonFormState,
+  type AgentJsonLookups,
+  parseFormStateFromJson,
+  serializeFormStateToJson,
+} from "@/components/agent-dialog-json-view";
 import type { AgentIconVariant } from "@/components/agent-icon";
 import { AgentIconPicker } from "@/components/agent-icon-picker";
 import {
@@ -54,6 +64,7 @@ import {
   type AgentToolsEditorRef,
 } from "@/components/agent-tools-editor";
 import { ModelSelector } from "@/components/chat/model-selector";
+import { Editor } from "@/components/editor";
 import { ExternalDocsLink } from "@/components/external-docs-link";
 import {
   formatPermissionRequirement,
@@ -628,6 +639,9 @@ export function AgentDialog({
   const [toolExposureMode, setToolExposureMode] =
     useState<ToolExposureMode>("full");
   const [isSaving, setIsSaving] = useState(false);
+  const [viewMode, setViewMode] = useState<"form" | "json">("form");
+  const [jsonValue, setJsonValue] = useState("");
+  const [jsonError, setJsonError] = useState<string | null>(null);
 
   // Determine type-specific visibility based on agentType prop
   const isInternalAgent = agentType === "agent";
@@ -746,6 +760,9 @@ export function AgentDialog({
       // Reset counts when dialog opens
       setSelectedToolsCount(0);
       lastAutoSelectedProviderRef.current = null;
+      setViewMode("form");
+      setJsonValue("");
+      setJsonError(null);
     }
   }, [open, agent, freshAgent, refetchAgent]);
 
@@ -862,7 +879,142 @@ export function AgentDialog({
     !isAdmin && scope === "team" && assignedTeamIds.length === 0;
   const hasNoAvailableTeams = !teams || teams.length === 0;
 
+  const buildJsonFormState = useCallback(
+    (): AgentJsonFormState => ({
+      name,
+      icon,
+      description,
+      systemPrompt,
+      suggestedPrompts,
+      selectedDelegationTargetIds,
+      assignedTeamIds,
+      labels,
+      considerContextUntrusted,
+      llmApiKeyId,
+      llmModel,
+      identityProviderId,
+      scope,
+      knowledgeBaseIds,
+      connectorIds,
+      autoConfigureOnToolDiscovery,
+      dualLlmMaxRounds,
+      passthroughHeaders,
+      toolAssignmentMode,
+      toolExposureMode,
+    }),
+    [
+      name,
+      icon,
+      description,
+      systemPrompt,
+      suggestedPrompts,
+      selectedDelegationTargetIds,
+      assignedTeamIds,
+      labels,
+      considerContextUntrusted,
+      llmApiKeyId,
+      llmModel,
+      identityProviderId,
+      scope,
+      knowledgeBaseIds,
+      connectorIds,
+      autoConfigureOnToolDiscovery,
+      dualLlmMaxRounds,
+      passthroughHeaders,
+      toolAssignmentMode,
+      toolExposureMode,
+    ],
+  );
+
+  const jsonLookups = useMemo<AgentJsonLookups>(
+    () => ({
+      agentType,
+      isBuiltIn,
+      isPolicyConfigBuiltIn,
+      isDualLlmMainBuiltIn,
+      teams: (teams ?? []).map((t) => ({ id: t.id, name: t.name })),
+      knowledgeBases: knowledgeBases.map((k) => ({ id: k.id, name: k.name })),
+      connectors: connectors.map((c) => ({
+        id: c.id,
+        name: c.name,
+        connectorType: c.connectorType,
+      })),
+      delegationTargets: allInternalAgents
+        .filter((a) => a.id !== agent?.id)
+        .map((a) => ({ id: a.id, name: a.name })),
+      currentAgentTools: (agent?.tools ?? []).map((t) => ({
+        toolName: t.name,
+        catalogName: null,
+      })),
+    }),
+    [
+      agentType,
+      isBuiltIn,
+      isPolicyConfigBuiltIn,
+      isDualLlmMainBuiltIn,
+      teams,
+      knowledgeBases,
+      connectors,
+      allInternalAgents,
+      agent,
+    ],
+  );
+
+  const applyParsedState = useCallback((parsed: AgentJsonFormState) => {
+    setName(parsed.name);
+    setIcon(parsed.icon);
+    setDescription(parsed.description);
+    setSystemPrompt(parsed.systemPrompt);
+    setSuggestedPrompts(parsed.suggestedPrompts);
+    setSelectedDelegationTargetIds(parsed.selectedDelegationTargetIds);
+    setAssignedTeamIds(parsed.assignedTeamIds);
+    setLabels(parsed.labels);
+    setConsiderContextUntrusted(parsed.considerContextUntrusted);
+    setLlmApiKeyId(parsed.llmApiKeyId);
+    setLlmModel(parsed.llmModel);
+    setIdentityProviderId(parsed.identityProviderId);
+    setScope(parsed.scope);
+    setKnowledgeBaseIds(parsed.knowledgeBaseIds);
+    setConnectorIds(parsed.connectorIds);
+    setAutoConfigureOnToolDiscovery(parsed.autoConfigureOnToolDiscovery);
+    setDualLlmMaxRounds(parsed.dualLlmMaxRounds);
+    setPassthroughHeaders(parsed.passthroughHeaders);
+    setToolAssignmentMode(parsed.toolAssignmentMode);
+    setToolExposureMode(parsed.toolExposureMode);
+  }, []);
+
+  const switchToJsonView = useCallback(() => {
+    setJsonValue(serializeFormStateToJson(buildJsonFormState(), jsonLookups));
+    setJsonError(null);
+    setViewMode("json");
+  }, [buildJsonFormState, jsonLookups]);
+
+  const switchToFormView = useCallback((): boolean => {
+    const result = parseFormStateFromJson(
+      jsonValue,
+      buildJsonFormState(),
+      jsonLookups,
+    );
+    if (!result.ok) {
+      setJsonError(result.error);
+      return false;
+    }
+    applyParsedState(result.state);
+    for (const w of result.warnings) toast.warning(w);
+    setJsonError(null);
+    setViewMode("form");
+    return true;
+  }, [jsonValue, buildJsonFormState, jsonLookups, applyParsedState]);
+
+  const pendingSubmitFromJsonRef = useRef(false);
+
   const handleSave = useCallback(async () => {
+    if (viewMode === "json") {
+      if (!switchToFormView()) return;
+      pendingSubmitFromJsonRef.current = true;
+      return;
+    }
+
     const trimmedName = name.trim();
     const trimmedSystemPrompt = systemPrompt.trim();
     const parsedDualLlmMaxRounds = Number.parseInt(dualLlmMaxRounds, 10);
@@ -1110,7 +1262,16 @@ export function AgentDialog({
     supportsAutomaticToolAssignment,
     deleteAgent,
     toolExposureMode,
+    viewMode,
+    switchToFormView,
   ]);
+
+  useEffect(() => {
+    if (viewMode === "form" && pendingSubmitFromJsonRef.current) {
+      pendingSubmitFromJsonRef.current = false;
+      void handleSave();
+    }
+  }, [viewMode, handleSave]);
 
   const handleClose = useCallback(() => {
     onOpenChange(false);
@@ -1169,7 +1330,78 @@ export function AgentDialog({
           className="flex min-h-0 flex-1 flex-col"
           onSubmit={handleSave}
         >
-          <fieldset disabled={readOnly} className="contents">
+          {viewMode === "json" && (
+            <div className="flex min-h-0 flex-1 flex-col px-4 py-4 gap-2">
+              {jsonError && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>{jsonError}</AlertDescription>
+                </Alert>
+              )}
+              <div className="min-h-0 flex-1 overflow-hidden rounded-md border">
+                <Editor
+                  height="100%"
+                  language="json"
+                  path={AGENT_JSON_MODEL_PATH}
+                  value={jsonValue}
+                  onChange={(value) => {
+                    setJsonValue(value ?? "");
+                    if (jsonError) setJsonError(null);
+                  }}
+                  beforeMount={(monaco) => {
+                    monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
+                      validate: true,
+                      allowComments: false,
+                      schemas: [
+                        {
+                          uri: "https://archestra.ai/schemas/agent-json-view.json",
+                          fileMatch: [AGENT_JSON_MODEL_PATH],
+                          schema: AGENT_JSON_SCHEMA,
+                        },
+                      ],
+                    });
+                  }}
+                  options={{
+                    readOnly,
+                    minimap: { enabled: false },
+                    lineNumbers: "on",
+                    folding: true,
+                    scrollBeyondLastLine: false,
+                    wordWrap: "on",
+                    fontSize: 13,
+                    tabSize: 2,
+                    padding: { top: 12, bottom: 12 },
+                    automaticLayout: true,
+                    scrollbar: {
+                      vertical: "auto",
+                      horizontal: "auto",
+                      verticalScrollbarSize: 10,
+                    },
+                    ariaLabel: "Edit agent as JSON",
+                    editContext: false,
+                    quickSuggestions: {
+                      other: true,
+                      comments: false,
+                      strings: true,
+                    },
+                    suggestOnTriggerCharacters: true,
+                    acceptSuggestionOnEnter: "on",
+                  }}
+                  loading={
+                    <div className="flex h-full w-full items-center justify-center bg-muted/50">
+                      <p className="text-sm text-muted-foreground">
+                        Loading editor...
+                      </p>
+                    </div>
+                  }
+                />
+              </div>
+            </div>
+          )}
+          <fieldset
+            disabled={readOnly}
+            className={cn("contents", viewMode === "json" && "hidden")}
+          >
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-4 space-y-4">
               {agentType === "profile" && (
                 <Alert variant="warning">
@@ -2196,30 +2428,56 @@ export function AgentDialog({
               )}
             </div>
           </fieldset>
-          <DialogStickyFooter className="mt-0">
-            <Button type="button" variant="outline" onClick={handleClose}>
-              {readOnly ? "Close" : "Cancel"}
+          <DialogStickyFooter className="mt-0 sm:justify-between">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (viewMode === "form") switchToJsonView();
+                else switchToFormView();
+              }}
+            >
+              {viewMode === "form" ? (
+                <>
+                  <Braces className="h-4 w-4 mr-1.5" />
+                  JSON View
+                </>
+              ) : (
+                <>
+                  <LayoutList className="h-4 w-4 mr-1.5" />
+                  Form View
+                </>
+              )}
             </Button>
-            {!readOnly && (
-              <Button
-                type="submit"
-                disabled={
-                  !name.trim() ||
-                  isSaving ||
-                  createAgent.isPending ||
-                  updateAgent.isPending ||
-                  requiresTeamSelection ||
-                  (!isAdmin && scope === "team" && hasNoAvailableTeams)
-                }
-              >
-                {(isSaving ||
-                  createAgent.isPending ||
-                  updateAgent.isPending) && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                {agent ? "Update" : "Create"}
+            <div className="flex flex-col-reverse gap-2 sm:flex-row">
+              <Button type="button" variant="outline" onClick={handleClose}>
+                {readOnly ? "Close" : "Cancel"}
               </Button>
-            )}
+              {!readOnly && (
+                <Button
+                  type="submit"
+                  disabled={
+                    (viewMode === "form" && !name.trim()) ||
+                    isSaving ||
+                    createAgent.isPending ||
+                    updateAgent.isPending ||
+                    (viewMode === "form" && requiresTeamSelection) ||
+                    (viewMode === "form" &&
+                      !isAdmin &&
+                      scope === "team" &&
+                      hasNoAvailableTeams)
+                  }
+                >
+                  {(isSaving ||
+                    createAgent.isPending ||
+                    updateAgent.isPending) && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  {agent ? "Update" : "Create"}
+                </Button>
+              )}
+            </div>
           </DialogStickyFooter>
         </DialogForm>
       </DialogContent>
