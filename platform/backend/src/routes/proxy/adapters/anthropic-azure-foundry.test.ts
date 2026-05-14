@@ -24,12 +24,14 @@ describe("anthropicAdapterFactory Azure Foundry", () => {
       _options?: {
         defaultHeaders?: Record<string, string>;
         fetch?: typeof globalThis.fetch;
+        timeout?: number | null;
       };
     };
 
     expect(client._options?.defaultHeaders?.Authorization).toBe(
       "Bearer <entra-id-managed>",
     );
+    expect(client._options?.timeout).toBeTypeOf("number");
 
     const fetch = client._options?.fetch;
     expect(fetch).toBeDefined();

@@ -1,3 +1,4 @@
+import type AnthropicProvider from "@anthropic-ai/sdk";
 import { describe, expect, test } from "@/test";
 import type { Anthropic } from "@/types";
 import { anthropicAdapterFactory } from "./anthropic";
@@ -440,5 +441,20 @@ describe("AnthropicRequestAdapter", () => {
         { type: "text", text: "[Image omitted due to size]" },
       ]);
     });
+  });
+});
+
+describe("anthropicAdapterFactory.createClient", () => {
+  test("sets timeout so the SDK skips its non-streaming preflight check", () => {
+    const client = anthropicAdapterFactory.createClient("test-key", {
+      baseUrl: "https://api.anthropic.com",
+      defaultHeaders: {},
+      source: "api",
+    }) as AnthropicProvider & {
+      _options?: { timeout?: number | null };
+    };
+
+    expect(client._options?.timeout).toBeTypeOf("number");
+    expect(client._options?.timeout).toBeGreaterThan(0);
   });
 });

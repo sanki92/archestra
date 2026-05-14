@@ -1169,6 +1169,10 @@ export const anthropicAdapterFactory: LLMProvider<
           // The fetch wrapper replaces this sentinel with a fresh Entra ID token on every request.
           Authorization: "Bearer <entra-id-managed>",
         },
+        // Setting timeout skips the SDK's client-side preflight in
+        // calculateNonstreamingTimeout, which otherwise refuses non-streaming
+        // requests whose max_tokens predicts >10 min runtime.
+        timeout: NONSTREAMING_TIMEOUT_MS,
       });
     }
 
@@ -1178,6 +1182,7 @@ export const anthropicAdapterFactory: LLMProvider<
       baseURL: options.baseUrl,
       fetch: customFetch,
       defaultHeaders: options.defaultHeaders,
+      timeout: NONSTREAMING_TIMEOUT_MS,
     });
   },
 
@@ -1257,3 +1262,5 @@ function createAnthropicAzureFoundryFetch(
     });
   };
 }
+
+const NONSTREAMING_TIMEOUT_MS = 10 * 60 * 1000;
