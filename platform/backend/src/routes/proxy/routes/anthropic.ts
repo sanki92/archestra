@@ -1,5 +1,6 @@
 import fastifyHttpProxy from "@fastify/http-proxy";
-import { RouteId } from "@shared";
+import { ApiError, hasArchestraTokenPrefix, RouteId } from "@shared";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import config from "@/config";
@@ -7,12 +8,17 @@ import logger from "@/logging";
 import { Anthropic, constructResponseSchema, UuidIdSchema } from "@/types";
 import { anthropicAdapterFactory } from "../adapters";
 import { PROXY_API_PREFIX, PROXY_BODY_LIMIT } from "../common";
+import {
+  validateVirtualApiKey,
+  virtualKeyRateLimiter,
+} from "../llm-proxy-auth";
 import { handleLLMProxy } from "../llm-proxy-handler";
 import { createProxyPreHandler } from "./proxy-prehandler";
 
 const anthropicProxyRoutes: FastifyPluginAsyncZod = async (fastify) => {
   const ANTHROPIC_PREFIX = `${PROXY_API_PREFIX}/anthropic`;
   const MESSAGES_SUFFIX = "/messages";
+  const MODELS_SUFFIX = "/v1/models";
 
   logger.info("[UnifiedProxy] Registering unified Anthropic routes");
 
@@ -113,6 +119,90 @@ const anthropicProxyRoutes: FastifyPluginAsyncZod = async (fastify) => {
       );
     },
   );
+
+  fastify.get(`${ANTHROPIC_PREFIX}${MODELS_SUFFIX}`, async (request, reply) =>
+    handleAnthropicModelsList(request, reply),
+  );
+
+  fastify.get(
+    `${ANTHROPIC_PREFIX}/:agentId${MODELS_SUFFIX}`,
+    {
+      schema: {
+        params: z.object({ agentId: UuidIdSchema }),
+      },
+    },
+    async (request, reply) => handleAnthropicModelsList(request, reply),
+  );
 };
 
 export default anthropicProxyRoutes;
+
+async function handleAnthropicModelsList(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<FastifyReply> {
+  const { apiKey, authToken, baseUrl } =
+    await resolveAnthropicProxyCredentials(request);
+
+  const queryIdx = request.url.indexOf("?");
+  const queryString = queryIdx >= 0 ? request.url.slice(queryIdx) : "";
+  const upstreamUrl = `${baseUrl ?? config.llm.anthropic.baseUrl}/v1/models${queryString}`;
+
+  const versionHeader = request.headers["anthropic-version"];
+  const upstreamHeaders: Record<string, string> = {
+    "anthropic-version":
+      (typeof versionHeader === "string" ? versionHeader : undefined) ??
+      "2023-06-01",
+  };
+  if (apiKey) upstreamHeaders["x-api-key"] = apiKey;
+  if (authToken) upstreamHeaders.authorization = `Bearer ${authToken}`;
+
+  const upstreamResponse = await fetch(upstreamUrl, {
+    method: "GET",
+    headers: upstreamHeaders,
+  });
+
+  const responseBody = await upstreamResponse.text();
+  const contentType =
+    upstreamResponse.headers.get("content-type") ?? "application/json";
+  return reply
+    .status(upstreamResponse.status)
+    .type(contentType)
+    .send(responseBody);
+}
+
+async function resolveAnthropicProxyCredentials(
+  request: FastifyRequest,
+): Promise<{ apiKey?: string; authToken?: string; baseUrl?: string }> {
+  const xApiKey = request.headers["x-api-key"];
+  const xApiKeyValue =
+    typeof xApiKey === "string" && xApiKey.length > 0 ? xApiKey : undefined;
+  const authHeader = request.headers.authorization;
+  const bearerToken =
+    typeof authHeader === "string" && authHeader.startsWith("Bearer ")
+      ? authHeader.slice(7)
+      : undefined;
+
+  const rawKey = xApiKeyValue ?? bearerToken;
+  if (!rawKey) {
+    throw new ApiError(401, "Missing authentication credentials");
+  }
+
+  if (hasArchestraTokenPrefix(rawKey)) {
+    await virtualKeyRateLimiter.check(request.ip);
+    try {
+      const resolved = await validateVirtualApiKey(rawKey, "anthropic");
+      return { apiKey: resolved.apiKey, baseUrl: resolved.baseUrl };
+    } catch (error) {
+      if (error instanceof ApiError && error.statusCode === 401) {
+        await virtualKeyRateLimiter.recordFailure(request.ip);
+      }
+      throw error;
+    }
+  }
+
+  if (xApiKeyValue) {
+    return { apiKey: xApiKeyValue };
+  }
+  return { authToken: bearerToken };
+}

@@ -330,6 +330,94 @@ describe("Anthropic virtual key auth", () => {
       await app.close();
     }
   });
+
+  test("GET /v1/models swaps archestra virtual key for upstream api key", async ({
+    makeOrganization,
+    makeSecret,
+    makeLlmProviderApiKey,
+  }) => {
+    const app = Fastify().withTypeProvider<ZodTypeProvider>();
+    app.setValidatorCompiler(validatorCompiler);
+    app.setSerializerCompiler(serializerCompiler);
+
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () => {
+        return new Response(
+          JSON.stringify({
+            data: [
+              { id: "claude-opus-4-20250514", type: "model" },
+              { id: "claude-3-5-sonnet-20241022", type: "model" },
+            ],
+            has_more: false,
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      });
+
+    try {
+      await app.register(anthropicProxyRoutes);
+
+      const organization = await makeOrganization();
+      const secret = await makeSecret({
+        secret: { apiKey: "sk-anthropic-parent-key" },
+      });
+      const chatApiKey = await makeLlmProviderApiKey(
+        organization.id,
+        secret.id,
+        { provider: "anthropic" },
+      );
+      const { value } = await VirtualApiKeyModel.create({
+        providerApiKeys: [
+          { provider: chatApiKey.provider, providerApiKeyId: chatApiKey.id },
+        ],
+        name: "anthropic-models-list-vk",
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/v1/anthropic/v1/models",
+        headers: { authorization: `Bearer ${value}` },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const firstCall = fetchSpy.mock.calls[0];
+      if (!firstCall) throw new Error("fetch was not called");
+      const [calledUrl, calledInit] = firstCall;
+      expect(String(calledUrl)).toBe("https://api.anthropic.com/v1/models");
+      const calledHeaders = (calledInit?.headers ?? {}) as Record<
+        string,
+        string
+      >;
+      expect(calledHeaders["x-api-key"]).toBe("sk-anthropic-parent-key");
+      expect(calledHeaders.authorization).toBeUndefined();
+
+      const body = JSON.parse(response.body) as { data: { id: string }[] };
+      expect(body.data.map((m) => m.id)).toContain("claude-opus-4-20250514");
+    } finally {
+      await app.close();
+    }
+  });
+
+  test("GET /v1/models rejects request without credentials", async () => {
+    const app = Fastify().withTypeProvider<ZodTypeProvider>();
+    app.setValidatorCompiler(validatorCompiler);
+    app.setSerializerCompiler(serializerCompiler);
+
+    try {
+      await app.register(anthropicProxyRoutes);
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/v1/anthropic/v1/models",
+      });
+
+      expect(response.statusCode).toBe(401);
+    } finally {
+      await app.close();
+    }
+  });
 });
 
 describe("Anthropic tool call accumulation", () => {
