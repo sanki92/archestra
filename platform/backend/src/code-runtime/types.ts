@@ -1,8 +1,17 @@
+export const CODE_RUNTIME_LIMITS = {
+  maxCodeBytes: 64 * 1024,
+  maxQueueLength: 50,
+  maxRequirements: 20,
+  maxRequirementBytes: 200,
+} as const;
+
 export interface RunCodeParams {
-  /** Python source to execute. */
+  /** python source to execute. */
   code: string;
   /** caller-requested wall-clock cap in seconds; clamped to the configured maximum. */
   timeoutSeconds?: number;
+  /** python package requirements passed to `uv run --with`. */
+  requirements?: string[];
 }
 
 export interface RunCodeResult {

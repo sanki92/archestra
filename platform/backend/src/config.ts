@@ -516,6 +516,9 @@ const mcpServerBaseImage =
   process.env.ARCHESTRA_ORCHESTRATOR_MCP_SERVER_BASE_IMAGE ||
   `europe-west1-docker.pkg.dev/friendly-path-465518-r6/archestra-public/mcp-server-base:${appVersion}`;
 
+const defaultCodeRuntimeImage =
+  "ghcr.io/astral-sh/uv:0.9.17-python3.12-bookworm-slim";
+
 const config = {
   frontendBaseUrl,
   api: {
@@ -805,7 +808,7 @@ const config = {
    */
   codeRuntime: {
     enabled: process.env.ARCHESTRA_CODE_RUNTIME_ENABLED === "true",
-    image: process.env.ARCHESTRA_CODE_RUNTIME_IMAGE || mcpServerBaseImage,
+    image: process.env.ARCHESTRA_CODE_RUNTIME_IMAGE || defaultCodeRuntimeImage,
     /** runner host for the Dagger Engine (sets _EXPERIMENTAL_DAGGER_RUNNER_HOST). */
     daggerEngineHost:
       process.env.ARCHESTRA_CODE_RUNTIME_DAGGER_ENGINE_HOST || undefined,

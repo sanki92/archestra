@@ -2,7 +2,11 @@ import { trace } from "@opentelemetry/api";
 import { TOOL_RUN_PYTHON_SHORT_NAME } from "@shared";
 import { z } from "zod";
 import { codeRuntimeService } from "@/code-runtime/code-runtime-service";
-import { CodeRuntimeError, type RunCodeResult } from "@/code-runtime/types";
+import {
+  CODE_RUNTIME_LIMITS,
+  CodeRuntimeError,
+  type RunCodeResult,
+} from "@/code-runtime/types";
 import config from "@/config";
 import logger from "@/logging";
 import {
@@ -13,7 +17,40 @@ import {
 } from "./helpers";
 
 const RunPythonArgsSchema = z.strictObject({
-  code: z.string().min(1).describe("Complete Python 3 source to execute."),
+  code: z
+    .string()
+    .min(1)
+    .refine(
+      (code) =>
+        Buffer.byteLength(code, "utf8") <= CODE_RUNTIME_LIMITS.maxCodeBytes,
+      {
+        message: `Code must be at most ${CODE_RUNTIME_LIMITS.maxCodeBytes} bytes.`,
+      },
+    )
+    .describe("Complete Python 3 source to execute."),
+  requirements: z
+    .array(
+      z
+        .string()
+        .trim()
+        .min(1)
+        .refine(
+          (requirement) =>
+            Buffer.byteLength(requirement, "utf8") <=
+            CODE_RUNTIME_LIMITS.maxRequirementBytes,
+          {
+            message: `Each requirement must be at most ${CODE_RUNTIME_LIMITS.maxRequirementBytes} bytes.`,
+          },
+        )
+        .refine((requirement) => !/[\r\n\0]/.test(requirement), {
+          message: "Each requirement must be a single line.",
+        }),
+    )
+    .max(CODE_RUNTIME_LIMITS.maxRequirements)
+    .optional()
+    .describe(
+      "Optional Python package requirements passed as repeated `uv run --with <requirement>` arguments, for example `requests` or `pandas==2.3.3`.",
+    ),
   timeout_seconds: z
     .number()
     .int()
@@ -49,6 +86,7 @@ const registry = defineArchestraTools([
       try {
         const result = await codeRuntimeService.run({
           code: args.code,
+          requirements: args.requirements,
           timeoutSeconds: args.timeout_seconds,
         });
 

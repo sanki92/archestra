@@ -3,6 +3,7 @@ import config from "@/config";
 import logger from "@/logging";
 import * as metrics from "@/observability/metrics";
 import {
+  CODE_RUNTIME_LIMITS,
   CodeRuntimeError,
   type RunCodeParams,
   type RunCodeResult,
@@ -14,7 +15,19 @@ type RuntimeStatus =
   | "ready"
   | "error"
   | "stopped";
-type CapturedRun = { stdout: string; stderr: string; exitCode: number };
+type CapturedRun = {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+  truncated: boolean;
+};
+type ValidatedRunParams = { code: string; requirements: string[] };
+
+class CodeRuntimeBackstopError extends CodeRuntimeError {
+  constructor(readonly pipeline: Promise<void>) {
+    super("the code run exceeded its time budget");
+  }
+}
 
 /**
  * Runs agent-provided Python scripts in throwaway Dagger containers.
@@ -26,6 +39,7 @@ type CapturedRun = { stdout: string; stderr: string; exitCode: number };
 class CodeRuntimeService {
   private status: RuntimeStatus = "disabled";
   private initPromise: Promise<void> | null = null;
+  private lastInitAttemptAt = 0;
   private activeRuns = 0;
   private readonly waiters: Array<() => void> = [];
 
@@ -45,9 +59,28 @@ class CodeRuntimeService {
    * call does the work, later calls await it. Never throws.
    */
   init(): Promise<void> {
-    if (!this.initPromise) {
-      this.initPromise = this.doInit();
+    if (!config.codeRuntime.enabled) {
+      this.status = "disabled";
+      return Promise.resolve();
     }
+
+    if (this.status === "ready" || this.status === "stopped") {
+      return Promise.resolve();
+    }
+
+    if (this.initPromise) return this.initPromise;
+
+    const now = Date.now();
+    if (
+      this.status === "error" &&
+      now - this.lastInitAttemptAt < INIT_RETRY_COOLDOWN_MS
+    ) {
+      return Promise.resolve();
+    }
+
+    this.initPromise = this.doInit().finally(() => {
+      this.initPromise = null;
+    });
     return this.initPromise;
   }
 
@@ -60,8 +93,12 @@ class CodeRuntimeService {
     if (!config.codeRuntime.enabled) {
       throw new CodeRuntimeError("the code runtime is not enabled");
     }
+    const runParams = validateRunParams(params);
     // lazily initialize so scheduled-agent runs in worker processes work too.
     await this.init();
+    if (this.status === "stopped") {
+      throw new CodeRuntimeError("the code runtime is stopped");
+    }
     if (this.status !== "ready") {
       throw new CodeRuntimeError(
         "the code runtime is not available (engine unreachable)",
@@ -71,10 +108,11 @@ class CodeRuntimeService {
     const timeoutSeconds = this.resolveTimeout(params.timeoutSeconds);
     const startedAt = Date.now();
     let acquired = false;
+    let releaseWhenSettled: Promise<void> | null = null;
     try {
       await this.acquire();
       acquired = true;
-      const result = await this.execute(params, timeoutSeconds, startedAt);
+      const result = await this.execute(runParams, timeoutSeconds, startedAt);
       metrics.codeRuntime.reportRun(
         result.timedOut
           ? "timeout"
@@ -85,6 +123,9 @@ class CodeRuntimeService {
       );
       return result;
     } catch (error) {
+      if (error instanceof CodeRuntimeBackstopError) {
+        releaseWhenSettled = error.pipeline;
+      }
       metrics.codeRuntime.reportRun(
         "runtime_error",
         (Date.now() - startedAt) / 1000,
@@ -92,12 +133,25 @@ class CodeRuntimeService {
       throw error;
     } finally {
       if (acquired) {
-        this.release();
+        if (releaseWhenSettled) {
+          void releaseWhenSettled
+            .catch((error) => {
+              logger.error(
+                { err: error },
+                "[CodeRuntime] Dagger pipeline failed after backstop timeout",
+              );
+            })
+            .finally(() => {
+              this.release();
+            });
+        } else {
+          this.release();
+        }
       }
     }
   }
 
-  /** Stops accepting new runs. Connect-per-run leaves nothing long-lived to close. */
+  /** stops accepting new runs. connect-per-run leaves nothing long-lived to close. */
   async shutdown(): Promise<void> {
     if (this.status === "ready") {
       this.status = "stopped";
@@ -113,6 +167,7 @@ class CodeRuntimeService {
     }
 
     this.applyDaggerEnv();
+    this.lastInitAttemptAt = Date.now();
     this.status = "initializing";
     try {
       await connect(async (client) => {
@@ -133,7 +188,7 @@ class CodeRuntimeService {
   }
 
   private async execute(
-    params: RunCodeParams,
+    params: ValidatedRunParams,
     timeoutSeconds: number,
     startedAt: number,
   ): Promise<RunCodeResult> {
@@ -149,45 +204,54 @@ class CodeRuntimeService {
         .container()
         .from(config.codeRuntime.image)
         .withWorkdir(WORKDIR)
+        .withUser(NON_ROOT_USER)
+        .withEnvVariable("HOME", WORKDIR)
+        .withEnvVariable("UV_CACHE_DIR", `${WORKDIR}/uv-cache`)
         .withNewFile(`${WORKDIR}/${SCRIPT_FILE}`, params.code)
-        .withExec(
-          [
-            "timeout",
-            "-s",
-            "KILL",
-            String(timeoutSeconds),
-            "python3",
-            SCRIPT_FILE,
-          ],
-          // accept any exit code: a failing script is a result, not a throw.
-          { expect: DaggerReturnType.Any },
+        .withNewFile(`${WORKDIR}/${RUNNER_FILE}`, RUNNER_SCRIPT)
+        .withExec(buildRunnerArgs(params.requirements, timeoutSeconds), {
+          expect: DaggerReturnType.Any,
+        });
+      const [stdout, stderr, exitCodeText, stdoutTruncated, stderrTruncated] =
+        await Promise.all([
+          container.file(STDOUT_FILE).contents(),
+          container.file(STDERR_FILE).contents(),
+          container.file(EXIT_CODE_FILE).contents(),
+          container.file(STDOUT_TRUNCATED_FILE).contents(),
+          container.file(STDERR_TRUNCATED_FILE).contents(),
+        ]);
+      const exitCode = Number.parseInt(exitCodeText.trim(), 10);
+      if (Number.isNaN(exitCode)) {
+        throw new CodeRuntimeError(
+          "the code runtime returned an invalid exit code",
         );
-      const [stdout, stderr, exitCode] = await Promise.all([
-        container.stdout(),
-        container.stderr(),
-        container.exitCode(),
-      ]);
-      resolveRun({ stdout, stderr, exitCode });
+      }
+      resolveRun({
+        stdout,
+        stderr,
+        exitCode,
+        truncated:
+          stdoutTruncated.trim() === "1" || stderrTruncated.trim() === "1",
+      });
     });
 
     // the in-container `timeout` should always fire first; this backstop only
     // catches a hung engine/session so the agent is never blocked indefinitely.
     const backstopMs = (timeoutSeconds + BACKSTOP_BUFFER_SECONDS) * 1000;
     if ((await raceWithTimeout(pipeline, backstopMs)) === "timeout") {
-      throw new CodeRuntimeError("the code run exceeded its time budget");
+      this.status = "error";
+      throw new CodeRuntimeBackstopError(pipeline);
     }
 
     // pipeline settled without timing out → the callback resolved runResult.
     const run = await runResult;
-    const stdout = truncate(run.stdout);
-    const stderr = truncate(run.stderr);
     return {
-      stdout: stdout.text,
-      stderr: stderr.text,
+      stdout: run.stdout,
+      stderr: run.stderr,
       exitCode: run.exitCode,
       durationMs: Date.now() - startedAt,
       timedOut: TIMEOUT_EXIT_CODES.has(run.exitCode),
-      truncated: stdout.truncated || stderr.truncated,
+      truncated: run.truncated,
     };
   }
 
@@ -216,9 +280,8 @@ class CodeRuntimeService {
       this.activeRuns++;
       return;
     }
-    // cap the queue: a wedged engine cannot pile up unbounded waiters, and the
-    // per-run backstop guarantees a slot eventually frees up.
-    if (this.waiters.length >= config.codeRuntime.maxConcurrent) {
+    // cap the queue so a wedged engine cannot pile up unbounded waiters.
+    if (this.waiters.length >= CODE_RUNTIME_LIMITS.maxQueueLength) {
       throw new CodeRuntimeError(
         "the code runtime is at capacity — too many runs are already queued",
       );
@@ -244,21 +307,111 @@ export const codeRuntimeService = new CodeRuntimeService();
 /** scripts run from /tmp — world-writable, so the non-root image user can write there. */
 const WORKDIR = "/tmp";
 const SCRIPT_FILE = "main.py";
+const RUNNER_FILE = "runner.sh";
+const STDOUT_FILE = `${WORKDIR}/stdout.txt`;
+const STDERR_FILE = `${WORKDIR}/stderr.txt`;
+const EXIT_CODE_FILE = `${WORKDIR}/exit-code.txt`;
+const STDOUT_TRUNCATED_FILE = `${WORKDIR}/stdout-truncated.txt`;
+const STDERR_TRUNCATED_FILE = `${WORKDIR}/stderr-truncated.txt`;
+const NON_ROOT_USER = "1000:1000";
 /** extra time beyond the script's own timeout before the hung-run backstop fires. */
 const BACKSTOP_BUFFER_SECONDS = 60;
+const INIT_RETRY_COOLDOWN_MS = 10_000;
 /** exit codes coreutils/busybox `timeout` reports when it kills the script. */
 const TIMEOUT_EXIT_CODES = new Set([124, 137]);
 
-function truncate(text: string): { text: string; truncated: boolean } {
-  const max = config.codeRuntime.maxOutputBytes;
-  const buf = Buffer.from(text, "utf8");
-  if (buf.byteLength <= max) {
-    return { text, truncated: false };
+const RUNNER_SCRIPT = `#!/bin/sh
+set -u
+
+timeout_seconds="$1"
+max_output_bytes="$2"
+shift 2
+
+stdout_raw="${WORKDIR}/stdout.raw"
+stderr_raw="${WORKDIR}/stderr.raw"
+
+timeout -s KILL "$timeout_seconds" uv run "$@" python3 "${SCRIPT_FILE}" > "$stdout_raw" 2> "$stderr_raw"
+exit_code=$?
+
+head -c "$max_output_bytes" "$stdout_raw" > "${STDOUT_FILE}"
+head -c "$max_output_bytes" "$stderr_raw" > "${STDERR_FILE}"
+
+stdout_bytes=$(wc -c < "$stdout_raw")
+stderr_bytes=$(wc -c < "$stderr_raw")
+
+if [ "$stdout_bytes" -gt "$max_output_bytes" ]; then
+  printf 1 > "${STDOUT_TRUNCATED_FILE}"
+else
+  printf 0 > "${STDOUT_TRUNCATED_FILE}"
+fi
+
+if [ "$stderr_bytes" -gt "$max_output_bytes" ]; then
+  printf 1 > "${STDERR_TRUNCATED_FILE}"
+else
+  printf 0 > "${STDERR_TRUNCATED_FILE}"
+fi
+
+printf "%s" "$exit_code" > "${EXIT_CODE_FILE}"
+exit 0
+`;
+
+function validateRunParams(params: RunCodeParams): ValidatedRunParams {
+  const codeBytes = Buffer.byteLength(params.code, "utf8");
+  if (codeBytes > CODE_RUNTIME_LIMITS.maxCodeBytes) {
+    throw new CodeRuntimeError(
+      `code is too large (${formatBytes(codeBytes)} > ${formatBytes(CODE_RUNTIME_LIMITS.maxCodeBytes)})`,
+    );
   }
+
   return {
-    text: `${buf.subarray(0, max).toString("utf8")}\n…[output truncated]`,
-    truncated: true,
+    code: params.code,
+    requirements: normalizeRequirements(params.requirements),
   };
+}
+
+function normalizeRequirements(requirements: string[] | undefined): string[] {
+  if (!requirements) return [];
+  if (requirements.length > CODE_RUNTIME_LIMITS.maxRequirements) {
+    throw new CodeRuntimeError(
+      `too many requirements (${requirements.length} > ${CODE_RUNTIME_LIMITS.maxRequirements})`,
+    );
+  }
+
+  return requirements.map((requirement, index) => {
+    const normalized = requirement.trim();
+    const bytes = Buffer.byteLength(normalized, "utf8");
+    if (!normalized) {
+      throw new CodeRuntimeError(`requirement ${index + 1} is empty`);
+    }
+    if (bytes > CODE_RUNTIME_LIMITS.maxRequirementBytes) {
+      throw new CodeRuntimeError(
+        `requirement ${index + 1} is too large (${formatBytes(bytes)} > ${formatBytes(CODE_RUNTIME_LIMITS.maxRequirementBytes)})`,
+      );
+    }
+    if (/[\r\n\0]/.test(normalized)) {
+      throw new CodeRuntimeError(
+        `requirement ${index + 1} must be a single line`,
+      );
+    }
+    return normalized;
+  });
+}
+
+function buildRunnerArgs(
+  requirements: string[],
+  timeoutSeconds: number,
+): string[] {
+  return [
+    "sh",
+    `${WORKDIR}/${RUNNER_FILE}`,
+    String(timeoutSeconds),
+    String(config.codeRuntime.maxOutputBytes),
+    ...requirements.flatMap((requirement) => ["--with", requirement]),
+  ];
+}
+
+function formatBytes(bytes: number): string {
+  return `${bytes} bytes`;
 }
 
 async function raceWithTimeout(

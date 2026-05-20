@@ -957,7 +957,9 @@ The sandbox inherits origin restrictions from `ARCHESTRA_FRONTEND_URL` and `ARCH
 
 The code execution runtime lets agents run Python scripts through the built-in `archestra__run_python` tool. Each call runs in a throwaway container — nothing persists between calls. It is backed by a Dagger Engine and is disabled by default; once enabled, assign the `run_python` tool to an agent to expose it.
 
-The Dagger Engine runs as a privileged container. Run it on an isolated node pool, away from sensitive workloads, and restrict access to it. Scripts run as a non-root user and have network access, but there is no egress filtering — treat agent-generated code as untrusted.
+The Dagger Engine runs as a privileged container. Run it on an isolated node pool, away from sensitive workloads, and restrict access to it. Scripts run as a non-root user and have network access, but treat agent-generated code as untrusted.
+
+For network hardening, scripts usually need outbound traffic to download data or Python packages, not inbound traffic. Deny ingress except platform-to-engine control traffic, allow DNS plus public outbound HTTPS, and block private, link-local, loopback, and cloud metadata CIDRs. Use a CNI with enforceable egress policies or route runtime traffic through an egress proxy if you need domain-level allowlists.
 
 Deployment by environment:
 
@@ -975,8 +977,8 @@ Deployment by environment:
 - **`ARCHESTRA_CODE_RUNTIME_DAGGER_CLI_BIN`** - Path to the `dagger` CLI binary (sets `_EXPERIMENTAL_DAGGER_CLI_BIN`).
   - Optional: the platform Docker image ships a pinned CLI and sets this automatically.
 
-- **`ARCHESTRA_CODE_RUNTIME_IMAGE`** - Container image scripts run in. Must include `python3`.
-  - Default: the MCP server base image.
+- **`ARCHESTRA_CODE_RUNTIME_IMAGE`** - Container image scripts run in. Must include `python3` and `uv`.
+  - Default: `ghcr.io/astral-sh/uv:0.9.17-python3.12-bookworm-slim`
 
 - **`ARCHESTRA_CODE_RUNTIME_TIMEOUT_SECONDS`** - Hard wall-clock limit per run, and the default when a caller omits one.
   - Default: `60`
@@ -986,6 +988,8 @@ Deployment by environment:
 
 - **`ARCHESTRA_CODE_RUNTIME_MAX_OUTPUT_BYTES`** - stdout and stderr are each truncated to this many bytes.
   - Default: `65536`
+
+The `run_python` tool also accepts an optional `requirements` array. Each entry is passed to `uv run --with`, so a script can request packages such as `requests` or `pandas==2.3.3` without persisting anything between runs.
 
 ### Observability & Metrics
 
