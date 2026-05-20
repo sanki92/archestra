@@ -69,20 +69,31 @@ class CodeRuntimeService {
     }
 
     const timeoutSeconds = this.resolveTimeout(params.timeoutSeconds);
-    await this.acquire();
     const startedAt = Date.now();
+    let acquired = false;
     try {
+      await this.acquire();
+      acquired = true;
       const result = await this.execute(params, timeoutSeconds, startedAt);
       metrics.codeRuntime.reportRun(
-        result.timedOut ? "timeout" : result.exitCode === 0 ? "ok" : "error",
+        result.timedOut
+          ? "timeout"
+          : result.exitCode === 0
+            ? "ok"
+            : "script_error",
         result.durationMs / 1000,
       );
       return result;
     } catch (error) {
-      metrics.codeRuntime.reportRun("error", (Date.now() - startedAt) / 1000);
+      metrics.codeRuntime.reportRun(
+        "runtime_error",
+        (Date.now() - startedAt) / 1000,
+      );
       throw error;
     } finally {
-      this.release();
+      if (acquired) {
+        this.release();
+      }
     }
   }
 
@@ -204,6 +215,13 @@ class CodeRuntimeService {
     if (this.activeRuns < config.codeRuntime.maxConcurrent) {
       this.activeRuns++;
       return;
+    }
+    // cap the queue: a wedged engine cannot pile up unbounded waiters, and the
+    // per-run backstop guarantees a slot eventually frees up.
+    if (this.waiters.length >= config.codeRuntime.maxConcurrent) {
+      throw new CodeRuntimeError(
+        "the code runtime is at capacity — too many runs are already queued",
+      );
     }
     // wait for a slot; release() hands one over without decrementing.
     await new Promise<void>((resolve) => this.waiters.push(resolve));

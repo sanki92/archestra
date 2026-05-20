@@ -67,7 +67,7 @@ const registry = defineArchestraTools([
           "run_python executed",
         );
 
-        return structuredSuccessResult(result, formatRunSummary(result));
+        return structuredSuccessResult({ ...result }, formatRunSummary(result));
       } catch (error) {
         if (error instanceof CodeRuntimeError) {
           return errorResult(error.message);

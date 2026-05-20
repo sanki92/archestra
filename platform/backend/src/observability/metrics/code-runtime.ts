@@ -11,7 +11,7 @@
 import client from "prom-client";
 import logger from "@/logging";
 
-type RunStatus = "ok" | "error" | "timeout";
+type RunStatus = "ok" | "script_error" | "runtime_error" | "timeout";
 
 let codeRuntimeRunsTotal: client.Counter<string>;
 let codeRuntimeRunDuration: client.Histogram<string>;
