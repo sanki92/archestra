@@ -53,7 +53,7 @@ frontend_env_vars = get_frontend_env()
 code_runtime_enabled = os.getenv('ARCHESTRA_CODE_RUNTIME_ENABLED') == 'true'
 backend_resource_deps = ['db-migrate']
 if code_runtime_enabled:
-  backend_resource_deps.append('dagger-engine')
+  backend_resource_deps.append('dagger-runtime-port-forward')
 
 local_resource(
   'pnpm-install',
@@ -82,10 +82,10 @@ else:
   # Backend dev server
   local_resource(
     dev_resource_name + '-backend',
-    # wrapper restarts the backend when the generated Dagger engine pod changes.
+    # wrapper injects the local TCP runner host when the code runtime is enabled.
     serve_cmd='sh run-backend-dev.sh',
-    # On Windows, pnpm dev runs directly; cmd.exe handles process termination when Tilt stops.
-    # Windows users enabling the code runtime set ARCHESTRA_CODE_RUNTIME_DAGGER_ENGINE_HOST in .env manually.
+    # on Windows, pnpm dev runs directly; cmd.exe handles process termination when Tilt stops.
+    # windows users enabling the code runtime set ARCHESTRA_CODE_RUNTIME_DAGGER_RUNNER_HOST in .env manually.
     serve_cmd_bat='set ARCHESTRA_LOGGING_LEVEL=debug && set ARCHESTRA_ANALYTICS=disabled && pnpm dev --filter @backend',
     labels=['dev'],
     resource_deps=backend_resource_deps,

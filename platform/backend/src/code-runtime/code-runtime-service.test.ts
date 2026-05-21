@@ -26,6 +26,10 @@ describe("codeRuntimeService", () => {
   ])("run() rejects invalid timeoutSeconds=%s before initializing", async (timeoutSeconds) => {
     vi.resetModules();
     vi.stubEnv("ARCHESTRA_CODE_RUNTIME_ENABLED", "true");
+    vi.stubEnv(
+      "ARCHESTRA_CODE_RUNTIME_DAGGER_RUNNER_HOST",
+      "tcp://dagger-runtime.dagger.svc.cluster.local:1234",
+    );
     const { codeRuntimeService: enabledCodeRuntimeService } = await import(
       "./code-runtime-service"
     );

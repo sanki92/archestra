@@ -965,24 +965,45 @@ The Dagger Engine runs as a privileged container. Run it on an isolated node poo
 
 For network hardening, scripts usually need outbound traffic to download data or Python packages, not inbound traffic. Deny ingress except platform-to-engine control traffic, allow DNS plus public outbound HTTPS, and block private, link-local, loopback, and cloud metadata CIDRs. Use a CNI with enforceable egress policies or route runtime traffic through an egress proxy if you need domain-level allowlists.
 
+Production Kubernetes deployments should install the companion `dagger-runtime` Helm chart in a separate namespace. It wraps Dagger's pinned official chart, exposes only an internal `ClusterIP` TCP service, disables Kubernetes service-account token mounting for the engine pod, uses a `StatefulSet` with PVC-backed cache by default, disables Dagger insecure root capabilities, and adds restrictive NetworkPolicies.
+
+Example Helm deployment:
+
+```bash
+helm upgrade --install dagger-runtime ./platform/helm/dagger-runtime \
+  --namespace dagger --create-namespace \
+  --set networkPolicy.ingress.allowedClients[0].namespace=archestra
+
+helm upgrade --install archestra ./platform/helm/archestra \
+  --namespace archestra --create-namespace \
+  --set archestra.codeRuntime.enabled=true \
+  --set archestra.codeRuntime.dagger.service.namespace=dagger
+```
+
+The Dagger `tcp://` transport is plaintext and unauthenticated. Keep it as an internal `ClusterIP` endpoint protected by NetworkPolicy, or put it behind service-mesh mTLS/VPN if it must cross a trust boundary. Never expose it through ingress, `NodePort`, or a public load balancer.
+
+The companion chart's default egress policy allows DNS to CoreDNS pods labeled `k8s-app=kube-dns` in `kube-system`, then public HTTPS except private, link-local, loopback, carrier-grade NAT, and metadata ranges. Override `networkPolicy.egress.dns` or append `networkPolicy.egress.additionalRules` if your cluster uses different DNS labels, private registries, or an egress proxy.
+
 Deployment by environment:
 
-- **Local dev (Tilt)** — set `ARCHESTRA_CODE_RUNTIME_ENABLED=true`. `tilt up` deploys the Dagger Engine into the local cluster with [Dagger's Helm chart](https://docs.dagger.io/reference/deployment/kubernetes/) and wires the backend to it; no other configuration is needed.
-- **Docker Quickstart** — set `ARCHESTRA_CODE_RUNTIME_ENABLED=true`. The SDK provisions an engine through the Docker socket automatically.
-- **Kubernetes** — deploy the Dagger Engine separately with the [Dagger Helm chart](https://docs.dagger.io/reference/deployment/kubernetes/), then point the platform at it via `ARCHESTRA_CODE_RUNTIME_DAGGER_ENGINE_HOST`.
+- **Local dev (Tilt)** — set `ARCHESTRA_CODE_RUNTIME_ENABLED=true`. `tilt up` deploys the companion Dagger runtime chart, port-forwards its internal service, and points the backend at `tcp://127.0.0.1:1234`.
+- **Kubernetes with Helm** — deploy `platform/helm/dagger-runtime` in a dedicated namespace, then enable `archestra.codeRuntime.enabled=true` in the platform chart. By default the platform connects to `tcp://dagger-runtime.dagger.svc.cluster.local:1234`.
+- **Custom Dagger runtime** — run a compatible Dagger Engine yourself and set `ARCHESTRA_CODE_RUNTIME_DAGGER_RUNNER_HOST` to its internal `tcp://host:port` endpoint.
 
 - **`ARCHESTRA_CODE_RUNTIME_ENABLED`** - Enable the code execution runtime and the `run_python` tool.
   - Default: `false`
 
-- **`ARCHESTRA_CODE_RUNTIME_DAGGER_ENGINE_HOST`** - Dagger Engine runner host (sets `_EXPERIMENTAL_DAGGER_RUNNER_HOST`).
-  - Optional: when unset, the SDK provisions an engine through the local Docker socket.
-  - Example: `kube-pod://dagger-engine-abc12?namespace=dagger`
+- **`ARCHESTRA_CODE_RUNTIME_DAGGER_RUNNER_HOST`** - Dagger runner host (sets `_EXPERIMENTAL_DAGGER_RUNNER_HOST`).
+  - Required when `ARCHESTRA_CODE_RUNTIME_ENABLED=true`.
+  - Must use `tcp://`.
+  - Example: `tcp://dagger-runtime.dagger.svc.cluster.local:1234`
 
 - **`ARCHESTRA_CODE_RUNTIME_DAGGER_CLI_BIN`** - Path to the `dagger` CLI binary (sets `_EXPERIMENTAL_DAGGER_CLI_BIN`).
   - Optional: the platform Docker image ships a pinned CLI and sets this automatically.
 
 - **`ARCHESTRA_CODE_RUNTIME_IMAGE`** - Container image scripts run in. Must include `python3` and `uv`.
   - Default: `ghcr.io/astral-sh/uv:0.9.17-python3.12-bookworm-slim`
+  - Helm: override through `archestra.env.ARCHESTRA_CODE_RUNTIME_IMAGE` only when you need a private mirror or custom runtime image.
 
 - **`ARCHESTRA_CODE_RUNTIME_TIMEOUT_SECONDS`** - Hard wall-clock limit per run, and the default when a caller omits one.
   - Default: `60`

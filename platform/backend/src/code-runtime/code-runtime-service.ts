@@ -356,10 +356,8 @@ class CodeRuntimeService {
    * never tries to provision its own or download the CLI at runtime.
    */
   private applyDaggerEnv(): void {
-    const { daggerEngineHost, daggerCliBin } = config.codeRuntime;
-    if (daggerEngineHost) {
-      process.env._EXPERIMENTAL_DAGGER_RUNNER_HOST = daggerEngineHost;
-    }
+    const { daggerRunnerHost, daggerCliBin } = config.codeRuntime;
+    process.env._EXPERIMENTAL_DAGGER_RUNNER_HOST = daggerRunnerHost;
     if (daggerCliBin) {
       process.env._EXPERIMENTAL_DAGGER_CLI_BIN = daggerCliBin;
     }

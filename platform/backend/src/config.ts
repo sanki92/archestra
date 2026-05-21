@@ -519,6 +519,35 @@ const mcpServerBaseImage =
 const defaultCodeRuntimeImage =
   "ghcr.io/astral-sh/uv:0.9.17-python3.12-bookworm-slim";
 
+/** @public — exported for testability */
+export const parseCodeRuntimeDaggerRunnerHost = ({
+  enabled,
+  envValue,
+}: {
+  enabled: boolean;
+  envValue: string | undefined;
+}): string | undefined => {
+  const runnerHost = envValue?.trim();
+  if (!enabled) return runnerHost || undefined;
+
+  if (!runnerHost) {
+    throw new Error(
+      "ARCHESTRA_CODE_RUNTIME_DAGGER_RUNNER_HOST must be set when ARCHESTRA_CODE_RUNTIME_ENABLED=true",
+    );
+  }
+
+  if (!runnerHost.startsWith("tcp://")) {
+    throw new Error(
+      "ARCHESTRA_CODE_RUNTIME_DAGGER_RUNNER_HOST must use tcp://",
+    );
+  }
+
+  return runnerHost;
+};
+
+const codeRuntimeEnabled =
+  process.env.ARCHESTRA_CODE_RUNTIME_ENABLED === "true";
+
 const config = {
   frontendBaseUrl,
   api: {
@@ -813,11 +842,13 @@ const config = {
    * `archestra__run_python` tool. backed by a Dagger Engine; disabled by default.
    */
   codeRuntime: {
-    enabled: process.env.ARCHESTRA_CODE_RUNTIME_ENABLED === "true",
+    enabled: codeRuntimeEnabled,
     image: process.env.ARCHESTRA_CODE_RUNTIME_IMAGE || defaultCodeRuntimeImage,
     /** runner host for the Dagger Engine (sets _EXPERIMENTAL_DAGGER_RUNNER_HOST). */
-    daggerEngineHost:
-      process.env.ARCHESTRA_CODE_RUNTIME_DAGGER_ENGINE_HOST || undefined,
+    daggerRunnerHost: parseCodeRuntimeDaggerRunnerHost({
+      enabled: codeRuntimeEnabled,
+      envValue: process.env.ARCHESTRA_CODE_RUNTIME_DAGGER_RUNNER_HOST,
+    }),
     /** path to a baked-in dagger CLI (sets _EXPERIMENTAL_DAGGER_CLI_BIN). */
     daggerCliBin:
       process.env.ARCHESTRA_CODE_RUNTIME_DAGGER_CLI_BIN || undefined,
