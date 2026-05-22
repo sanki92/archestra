@@ -66,6 +66,28 @@ vi.mock("@/k8s/mcp-server-runtime", () => ({
   },
 }));
 
+// Wait for the reinstall route's `setImmediate`-scheduled background work
+// to flip the install row off "pending". Fails the test if it doesn't —
+// without this assertion a stalled async reinstall would exit the polling
+// loop silently and leak into the next test in the file.
+async function drainPendingReinstall(mcpServerId: string): Promise<void> {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const [serverRow] = await db
+      .select()
+      .from(schema.mcpServersTable)
+      .where(eq(schema.mcpServersTable.id, mcpServerId));
+
+    if (serverRow?.localInstallationStatus !== "pending") {
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error(
+    `drainPendingReinstall(${mcpServerId}) timed out after 2s — background reinstall did not complete`,
+  );
+}
+
 describe("mcp server inspect route", () => {
   let app: FastifyInstanceWithZod;
   let user: User;
@@ -1133,18 +1155,7 @@ describe("mcp server inspect route", () => {
     // autoReinstallServer with a tool-fetch that takes longer when
     // mocks aren't pre-primed — give it 2s so we don't leak a
     // "pending" install whose async error fires inside the next test.
-    for (let attempt = 0; attempt < 100; attempt += 1) {
-      const [serverRow] = await db
-        .select()
-        .from(schema.mcpServersTable)
-        .where(eq(schema.mcpServersTable.id, mcpServer.id));
-
-      if (serverRow?.localInstallationStatus !== "pending") {
-        break;
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    }
+    await drainPendingReinstall(mcpServer.id);
   });
 
   // Regression: reinstall of a local MCP server with a newly-added prompted
@@ -1208,18 +1219,7 @@ describe("mcp server inspect route", () => {
       PROMPTED_PLAIN_VALUE: "user-entered-at-reinstall",
     });
 
-    for (let attempt = 0; attempt < 100; attempt += 1) {
-      const [serverRow] = await db
-        .select()
-        .from(schema.mcpServersTable)
-        .where(eq(schema.mcpServersTable.id, mcpServer.id));
-
-      if (serverRow?.localInstallationStatus !== "pending") {
-        break;
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    }
+    await drainPendingReinstall(mcpServer.id);
   });
 
   // Regression: the install dialog drops empty fields before submitting,
@@ -1287,18 +1287,7 @@ describe("mcp server inspect route", () => {
       NEW_REQUIRED_VAR: "user-fills-only-this",
     });
 
-    for (let attempt = 0; attempt < 100; attempt += 1) {
-      const [serverRow] = await db
-        .select()
-        .from(schema.mcpServersTable)
-        .where(eq(schema.mcpServersTable.id, mcpServer.id));
-
-      if (serverRow?.localInstallationStatus !== "pending") {
-        break;
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    }
+    await drainPendingReinstall(mcpServer.id);
   });
 
   // Required plain env vars already on the row are satisfied by the merged
@@ -1363,17 +1352,7 @@ describe("mcp server inspect route", () => {
       NEW_REQUIRED: "user-fills-only-this",
     });
 
-    for (let attempt = 0; attempt < 100; attempt += 1) {
-      const [serverRow] = await db
-        .select()
-        .from(schema.mcpServersTable)
-        .where(eq(schema.mcpServersTable.id, mcpServer.id));
-
-      if (serverRow?.localInstallationStatus !== "pending") {
-        break;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    }
+    await drainPendingReinstall(mcpServer.id);
   });
 
   // An explicit empty string for a prompted plain key clears it from the
@@ -1427,17 +1406,7 @@ describe("mcp server inspect route", () => {
 
     expect(updatedServer?.environmentValues).toEqual({});
 
-    for (let attempt = 0; attempt < 100; attempt += 1) {
-      const [serverRow] = await db
-        .select()
-        .from(schema.mcpServersTable)
-        .where(eq(schema.mcpServersTable.id, mcpServer.id));
-
-      if (serverRow?.localInstallationStatus !== "pending") {
-        break;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    }
+    await drainPendingReinstall(mcpServer.id);
   });
 
   test("automatically retries protected remote MCP server installation with an exchanged enterprise-managed credential", async ({
