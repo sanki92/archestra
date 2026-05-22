@@ -134,5 +134,6 @@ jobs:
             --namespace dagger \
             --create-namespace \
             --set "networkPolicy.egress.additionalDeniedCidrs={${POD_CIDR},${SVC_CIDR}}" \
+            --set-json 'networkPolicy.ingress.allowedClients=[{"namespace":"archestra","podLabels":{"app.kubernetes.io/part-of":"archestra"}}]' \
             --wait \
             --timeout 10m

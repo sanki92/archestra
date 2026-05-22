@@ -30,7 +30,7 @@ tests:
           path: spec.selector.name
           value: dagger-runtime-engine
 
-  - it: restricts ingress to Archestra clients in any namespace by default
+  - it: denies all ingress by default
     template: networkpolicy.yaml
     asserts:
       - equal:
@@ -39,14 +39,8 @@ tests:
             - Ingress
             - Egress
       - equal:
-          path: spec.ingress[0].from[0].namespaceSelector
-          value: {}
-      - equal:
-          path: spec.ingress[0].from[0].podSelector.matchLabels["app.kubernetes.io/part-of"]
-          value: archestra
-      - equal:
-          path: spec.ingress[0].ports[0].port
-          value: 1234
+          path: spec.ingress
+          value: []
 
   - it: pins ingress to a namespace when one is configured
     template: networkpolicy.yaml
@@ -59,6 +53,22 @@ tests:
       - equal:
           path: spec.ingress[0].from[0].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
           value: archestra-prod
+      - equal:
+          path: spec.ingress[0].from[0].podSelector.matchLabels["app.kubernetes.io/part-of"]
+          value: archestra
+      - equal:
+          path: spec.ingress[0].ports[0].port
+          value: 1234
+
+  - it: fails when an allowed client omits its namespace
+    template: networkpolicy.yaml
+    set:
+      networkPolicy.ingress.allowedClients:
+        - podLabels:
+            app.kubernetes.io/part-of: archestra
+    asserts:
+      - failedTemplate:
+          errorPattern: must set a namespace
 
   - it: restricts egress to DNS and public HTTPS by default
     template: networkpolicy.yaml

@@ -20,13 +20,11 @@ networkPolicy:
   create: true
 
   ingress:
-    # allow pods carrying these labels to reach Dagger. With no `namespace`,
-    # an entry matches such pods in ANY namespace, so the chart works out of
-    # the box wherever archestra-platform is installed. Production deployments
-    # should pin `namespace` to the archestra-platform release namespace.
-    allowedClients:
-      - podLabels:
-          app.kubernetes.io/part-of: archestra
+    # clients allowed to reach the plaintext Dagger TCP endpoint. empty denies
+    # all ingress — the engine is privileged, so access is opt-in. each entry
+    # must set `namespace` (the archestra-platform release namespace) and
+    # `podLabels`; an entry without `namespace` fails chart rendering.
+    allowedClients: []
 
     # extra ingress rules appended verbatim under spec.ingress.
     additionalRules: []
