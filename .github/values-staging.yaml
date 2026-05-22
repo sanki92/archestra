@@ -43,6 +43,11 @@ archestra:
     ARCHESTRA_CHAT_DEFAULT_PROVIDER: "anthropic"
     ARCHESTRA_CHAT_DEFAULT_MODEL: "claude-opus-4-5-20251101"
 
+  # code execution runtime — backend connects to the dagger-runtime chart
+  # deployed in the `dagger` namespace by the staging workflow.
+  codeRuntime:
+    enabled: true
+
   diagnostics:
     enabled: true
     storageClassName: "archestra-diagnostics-rwx"

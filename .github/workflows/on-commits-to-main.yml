@@ -100,3 +100,39 @@ jobs:
             --set "archestra.env.ARCHESTRA_CHAT_ANTHROPIC_API_KEY=${ARCHESTRA_STAGING_CHAT_ANTHROPIC_API_KEY}" \
             --values .github/values-staging.yaml \
             --wait
+
+      - name: Deploy Dagger code runtime
+        run: |
+          CLUSTER_FLAGS="--zone us-central1-a --project friendly-path-465518-r6"
+
+          # the engine's egress NetworkPolicy (metadata + in-cluster blocks) is
+          # inert unless the cluster enforces NetworkPolicy. fail loudly rather
+          # than ship an internet-capable sandbox with no enforced egress.
+          DATAPATH=$(gcloud container clusters describe archestra-staging $CLUSTER_FLAGS \
+            --format='value(networkConfig.datapathProvider)')
+          NETPOL=$(gcloud container clusters describe archestra-staging $CLUSTER_FLAGS \
+            --format='value(networkPolicy.enabled)')
+          if [ "$DATAPATH" != "ADVANCED_DATAPATH" ] && [ "$NETPOL" != "True" ]; then
+            echo "::error::archestra-staging does not enforce NetworkPolicy (datapath='$DATAPATH' networkPolicy='$NETPOL'); enable Dataplane V2 or the network-policy add-on before deploying the code runtime"
+            exit 1
+          fi
+
+          # discover Pod/Service CIDRs so sandboxed code cannot reach
+          # in-cluster services through the engine's public-egress rule.
+          POD_CIDR=$(gcloud container clusters describe archestra-staging $CLUSTER_FLAGS \
+            --format='value(clusterIpv4Cidr)')
+          SVC_CIDR=$(gcloud container clusters describe archestra-staging $CLUSTER_FLAGS \
+            --format='value(servicesIpv4Cidr)')
+          if [ -z "$POD_CIDR" ] || [ -z "$SVC_CIDR" ]; then
+            echo "::error::could not resolve staging cluster CIDRs (pod='$POD_CIDR' svc='$SVC_CIDR')"
+            exit 1
+          fi
+
+          helm upgrade dagger-runtime \
+            ./platform/helm/dagger-runtime \
+            --install \
+            --namespace dagger \
+            --create-namespace \
+            --set "networkPolicy.egress.additionalDeniedCidrs={${POD_CIDR},${SVC_CIDR}}" \
+            --wait \
+            --timeout 10m
