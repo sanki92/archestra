@@ -4,9 +4,7 @@ import * as Sentry from "@sentry/nextjs";
 import { usePathname, useRouter } from "next/navigation";
 import type React from "react";
 import { useEffect, useState } from "react";
-import { authClient } from "@/lib/clients/auth/auth-client";
 import { useSession } from "@/lib/auth/auth.query";
-import { isDefaultPasswordChangePending } from "@/lib/auth/default-password-change";
 import { getValidatedRedirectPath } from "@/lib/utils/redirect-validation";
 
 type SentryUser = Parameters<typeof Sentry.setUser>[0];
