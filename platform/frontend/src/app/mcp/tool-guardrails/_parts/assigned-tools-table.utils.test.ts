@@ -1,6 +1,9 @@
-import type { archestraApiTypes } from "@shared";
+import { AGENT_TOOL_PREFIX, type archestraApiTypes } from "@shared";
 import { describe, expect, it } from "vitest";
-import { getVisibleCatalogSources } from "./assigned-tools-table.utils";
+import {
+  getVisibleCatalogSources,
+  resolveToolSource,
+} from "./assigned-tools-table.utils";
 
 type InternalMcpCatalogItem =
   archestraApiTypes.GetInternalMcpCatalogResponses["200"][number];
@@ -46,5 +49,65 @@ describe("getVisibleCatalogSources", () => {
         }),
       ]),
     ).toHaveLength(1);
+  });
+});
+
+describe("resolveToolSource", () => {
+  it("resolves a tool to its parent catalog item", () => {
+    const parent = makeCatalogItem({ id: "context7", name: "context7" });
+    expect(
+      resolveToolSource({
+        catalogId: "context7",
+        toolName: "query-docs",
+        internalMcpCatalogItems: [parent],
+      }),
+    ).toEqual({ type: "catalog", catalogItem: parent });
+  });
+
+  it("resolves a tool from a child preset catalog item (not LLM Proxy)", () => {
+    // Regression: child preset rows must be present in the catalog list so
+    // their tools resolve to the catalog source instead of falling back.
+    const child = makeCatalogItem({
+      id: "context7-sandbox",
+      name: "context7-sandbox",
+      parentCatalogItemId: "context7",
+    });
+    expect(
+      resolveToolSource({
+        catalogId: "context7-sandbox",
+        toolName: "query-docs",
+        internalMcpCatalogItems: [child],
+      }),
+    ).toEqual({ type: "catalog", catalogItem: child });
+  });
+
+  it("falls back to llm-proxy when the catalog item is missing", () => {
+    expect(
+      resolveToolSource({
+        catalogId: "context7-sandbox",
+        toolName: "query-docs",
+        internalMcpCatalogItems: [makeCatalogItem({ id: "context7" })],
+      }),
+    ).toEqual({ type: "llm-proxy" });
+  });
+
+  it("classifies tools with no catalogId as llm-proxy", () => {
+    expect(
+      resolveToolSource({
+        catalogId: null,
+        toolName: "some-discovered-tool",
+        internalMcpCatalogItems: [],
+      }),
+    ).toEqual({ type: "llm-proxy" });
+  });
+
+  it("classifies agent delegation tools as agent", () => {
+    expect(
+      resolveToolSource({
+        catalogId: null,
+        toolName: `${AGENT_TOOL_PREFIX}context7_sandbox`,
+        internalMcpCatalogItems: [],
+      }),
+    ).toEqual({ type: "agent" });
   });
 });

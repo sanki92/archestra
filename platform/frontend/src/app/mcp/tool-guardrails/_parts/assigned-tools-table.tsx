@@ -77,7 +77,10 @@ import {
 } from "@/lib/tools/tool.query";
 import { isMcpToolByProperties } from "@/lib/tools/tool.utils";
 import type { ToolsInitialData } from "../types";
-import { getVisibleCatalogSources } from "./assigned-tools-table.utils";
+import {
+  getVisibleCatalogSources,
+  resolveToolSource,
+} from "./assigned-tools-table.utils";
 import { CallPolicyToggle } from "./call-policy-toggle";
 
 type GetToolsWithAssignmentsQueryParams = NonNullable<
@@ -130,6 +133,7 @@ export function AssignedToolsTable({
   );
   const { data: internalMcpCatalogItems } = useInternalMcpCatalog({
     initialData: initialData?.internalMcpCatalog,
+    includeChildren: true,
   });
 
   const {
@@ -510,12 +514,14 @@ export function AssignedToolsTable({
           </Button>
         ),
         cell: ({ row }) => {
-          const catalogItemId = row.original.catalogId;
-          const catalogItem = internalMcpCatalogItems?.find(
-            (item) => item.id === catalogItemId,
-          );
+          const source = resolveToolSource({
+            catalogId: row.original.catalogId,
+            toolName: row.original.name,
+            internalMcpCatalogItems,
+          });
 
-          if (catalogItem) {
+          if (source.type === "catalog") {
+            const catalogItem = source.catalogItem;
             return (
               <div className="min-w-0 max-w-full">
                 <TooltipProvider>
@@ -544,7 +550,7 @@ export function AssignedToolsTable({
             );
           }
 
-          if (isAgentTool(row.original.name)) {
+          if (source.type === "agent") {
             const agentName = row.original.name
               .slice(AGENT_TOOL_PREFIX.length)
               .replaceAll("_", " ");

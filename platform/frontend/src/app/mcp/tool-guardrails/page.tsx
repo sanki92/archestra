@@ -52,7 +52,10 @@ export default async function ToolGuardrailsPage() {
           excludeArchestraTools: true,
         },
       }),
-      archestraApiSdk.getInternalMcpCatalog({ headers }),
+      archestraApiSdk.getInternalMcpCatalog({
+        headers,
+        query: { includeChildren: true },
+      }),
       archestraApiSdk.getToolInvocationPolicies({ headers }),
       archestraApiSdk.getTrustedDataPolicies({ headers }),
     ]);
