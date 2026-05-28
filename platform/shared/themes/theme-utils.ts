@@ -2,10 +2,19 @@
  * Theme utilities - processes tweakcn-themes.json to extract theme data
  */
 
-import { DEFAULT_THEME_ID, SUPPORTED_THEMES } from "./theme-config";
+import {
+  CUSTOM_THEME_ID,
+  DEFAULT_THEME_ID,
+  SUPPORTED_THEMES,
+} from "./theme-config";
 import themeRegistry from "./tweakcn-themes.json";
 
-export { DEFAULT_THEME_ID };
+export { CUSTOM_THEME_ID, DEFAULT_THEME_ID };
+
+// Display titles for themes that are not authored in tweakcn-themes.json
+const RUNTIME_ONLY_TITLES: Record<string, string> = {
+  [CUSTOM_THEME_ID]: "Custom",
+};
 
 // Extract theme ID type from the const tuple
 export type ThemeId = (typeof SUPPORTED_THEMES)[number];
@@ -48,7 +57,7 @@ export function getThemeMetadata(): ThemeMetadata[] {
     const item = itemsByName.get(id);
     return {
       id,
-      name: item?.title || id,
+      name: item?.title || RUNTIME_ONLY_TITLES[id] || id,
     };
   });
 }

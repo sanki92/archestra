@@ -333,6 +333,7 @@ export function useUpdateAppearanceSettings(
       queryClient.setQueryData(appearanceKeys.public(), {
         theme: updatedOrganization.theme,
         customFont: updatedOrganization.customFont,
+        customTheme: updatedOrganization.customTheme,
         logo: updatedOrganization.logo,
         logoDark: updatedOrganization.logoDark,
         favicon: updatedOrganization.favicon,

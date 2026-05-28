@@ -1,8 +1,14 @@
 "use client";
 
-import { DEFAULT_APP_DESCRIPTION, DEFAULT_APP_NAME } from "@shared";
+import {
+  CUSTOM_THEME_ID,
+  type CustomTheme,
+  DEFAULT_APP_DESCRIPTION,
+  DEFAULT_APP_NAME,
+  getThemeItemById,
+} from "@shared";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   SettingsCardHeader,
   SettingsSaveBar,
@@ -20,7 +26,7 @@ import {
   useUpdateAppearanceSettings,
   useUpdateAuthSettings,
 } from "@/lib/organization.query";
-import { useOrgTheme } from "@/lib/theme.hook";
+import { applyCustomThemeCss, useOrgTheme } from "@/lib/theme.hook";
 import { ChatLinksEditor } from "./_components/chat-links-editor";
 import {
   type ChatLinkEditorValue,
@@ -28,6 +34,7 @@ import {
   validateChatLink,
 } from "./_components/chat-links-editor.utils";
 import { ChatPlaceholdersEditor } from "./_components/chat-placeholders-editor";
+import { CustomThemeEditor } from "./_components/custom-theme-editor";
 import { FaviconUpload } from "./_components/favicon-upload";
 import { LogosSection } from "./_components/logos-section";
 import { OAuthTokenLifetimeSection } from "./_components/oauth-token-lifetime-section";
@@ -58,6 +65,7 @@ export default function OrganizationSettingsPage() {
   const {
     currentUITheme,
     themeFromBackend,
+    customTheme: customThemeFromBackend,
     setPreviewTheme,
     applyThemeOnUI,
     saveAppearance,
@@ -68,6 +76,7 @@ export default function OrganizationSettingsPage() {
   } = orgTheme ?? {
     currentUITheme: "modern-minimal" as const,
     DEFAULT_THEME: "modern-minimal" as const,
+    customTheme: null,
   };
 
   useOnUnmount(() => {
@@ -75,6 +84,9 @@ export default function OrganizationSettingsPage() {
       applyThemeOnUI?.(themeFromBackend);
       setPreviewTheme?.(themeFromBackend);
     }
+    // Drop any in-flight custom-theme draft preview so the rest of the app
+    // doesn't keep rendering unsaved CSS variables.
+    applyCustomThemeCss(customThemeFromBackend ?? null);
   });
 
   const handleLogoChange = useCallback(() => {
@@ -109,6 +121,12 @@ export default function OrganizationSettingsPage() {
     boolean | null
   >(null);
   const [showTwoFactor, setShowTwoFactor] = useState<boolean | null>(null);
+  // `undefined` = untouched; `null` = explicitly cleared
+  const [customThemeDraft, setCustomThemeDraft] = useState<
+    CustomTheme | null | undefined
+  >(undefined);
+  const [isCustomThemeDialogOpen, setIsCustomThemeDialogOpen] = useState(false);
+  const [isCustomThemeValid, setIsCustomThemeValid] = useState(true);
 
   // Derived values (use local state if changed, otherwise org data)
   const effectiveAppName = appName ?? organization?.appName ?? "";
@@ -182,7 +200,21 @@ export default function OrganizationSettingsPage() {
     slimChatErrorUi !== null ||
     chatPlaceholders !== null ||
     animateChatPlaceholders !== null ||
-    showTwoFactor !== null;
+    showTwoFactor !== null ||
+    customThemeDraft !== undefined;
+
+  const effectiveCustomTheme: CustomTheme | null =
+    customThemeDraft !== undefined
+      ? customThemeDraft
+      : (customThemeFromBackend ?? null);
+
+  // Drive a live preview of the draft custom theme on the page underneath
+  // the editor dialog. When the user navigates away from the `custom` theme,
+  // the hook's own effect takes back over and clears the override.
+  useEffect(() => {
+    if (currentUITheme !== CUSTOM_THEME_ID) return;
+    applyCustomThemeCss(effectiveCustomTheme);
+  }, [currentUITheme, effectiveCustomTheme]);
 
   const handleSaveFields = async () => {
     const data: Record<string, unknown> = {};
@@ -209,6 +241,9 @@ export default function OrganizationSettingsPage() {
     if (animateChatPlaceholders !== null) {
       data.animateChatPlaceholders = animateChatPlaceholders;
     }
+    if (customThemeDraft !== undefined) {
+      data.customTheme = customThemeDraft;
+    }
     const updatedOrganization = await updateMutation.mutateAsync(data);
     if (!updatedOrganization) {
       return;
@@ -227,6 +262,8 @@ export default function OrganizationSettingsPage() {
     setChatPlaceholders(null);
     setAnimateChatPlaceholders(null);
     setShowTwoFactor(null);
+    setCustomThemeDraft(undefined);
+    setIsCustomThemeValid(true);
   };
 
   const handleSaveAuthFields = async () => {
@@ -272,9 +309,37 @@ export default function OrganizationSettingsPage() {
           <ThemeSelector
             selectedTheme={currentUITheme}
             onThemeSelect={(themeId) => {
+              if (themeId === CUSTOM_THEME_ID) {
+                // Seed the JSON from whichever theme the page is currently
+                // showing so the dialog never opens against a blank canvas.
+                if (effectiveCustomTheme === null) {
+                  const seedFrom =
+                    currentUITheme === CUSTOM_THEME_ID
+                      ? themeFromBackend
+                      : currentUITheme;
+                  const seedItem = seedFrom
+                    ? getThemeItemById(seedFrom)
+                    : undefined;
+                  if (seedItem) {
+                    setCustomThemeDraft({
+                      light: { ...seedItem.cssVars.light },
+                      dark: { ...seedItem.cssVars.dark },
+                    });
+                  }
+                }
+                setIsCustomThemeDialogOpen(true);
+              }
               setPreviewTheme?.(themeId);
               setHasThemeChanges(themeId !== themeFromBackend);
             }}
+          />
+
+          <CustomThemeEditor
+            open={isCustomThemeDialogOpen}
+            onOpenChange={setIsCustomThemeDialogOpen}
+            value={effectiveCustomTheme}
+            onChange={(next) => setCustomThemeDraft(next)}
+            onValidityChange={setIsCustomThemeValid}
           />
 
           <Card>
@@ -468,7 +533,8 @@ export default function OrganizationSettingsPage() {
               chatErrorSupportMessage !== null ||
               slimChatErrorUi !== null ||
               chatPlaceholders !== null ||
-              animateChatPlaceholders !== null)
+              animateChatPlaceholders !== null ||
+              customThemeDraft !== undefined)
           ) {
             await handleSaveFields();
           }
@@ -489,10 +555,13 @@ export default function OrganizationSettingsPage() {
           setChatPlaceholders(null);
           setAnimateChatPlaceholders(null);
           setShowTwoFactor(null);
+          setCustomThemeDraft(undefined);
+          setIsCustomThemeValid(true);
         }}
         disabledSave={
           hasLiveChatLinkValidationErrors ||
-          hasLiveOnboardingWizardValidationError
+          hasLiveOnboardingWizardValidationError ||
+          !isCustomThemeValid
         }
       />
     </SettingsSectionStack>

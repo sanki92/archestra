@@ -11,7 +11,21 @@ export const OrganizationCustomFontSchema = z.enum([
   "jetbrains-mono",
 ]);
 
+/**
+ * Free-form CSS variable map. Keys are CSS variable names without the `--`
+ * prefix (e.g. `background`, `font-sans`, `radius`). Values are raw CSS values.
+ * We deliberately do not enumerate keys here — the custom theme is meant to
+ * expose every variable the platform reads, so admins can override anything.
+ */
+const CustomThemeVarsSchema = z.record(z.string(), z.string());
+
+export const CustomThemeSchema = z.object({
+  light: CustomThemeVarsSchema,
+  dark: CustomThemeVarsSchema,
+});
+
 export type OrganizationTheme = z.infer<typeof OrganizationThemeSchema>;
 export type OrganizationCustomFont = z.infer<
   typeof OrganizationCustomFontSchema
 >;
+export type CustomTheme = z.infer<typeof CustomThemeSchema>;

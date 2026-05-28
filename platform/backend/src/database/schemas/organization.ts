@@ -1,4 +1,5 @@
 import type {
+  CustomTheme,
   OrganizationCustomFont,
   OrganizationTheme,
   SupportedProvider,
@@ -41,6 +42,12 @@ const organizationsTable = pgTable("organization", {
     .$type<OrganizationCustomFont>()
     .notNull()
     .default("lato"),
+  /**
+   * Free-form CSS variable map injected at runtime when `theme = "custom"`.
+   * Shape: { light: { [var]: value }, dark: { [var]: value } }. Null until an
+   * admin authors a custom theme via /settings/appearance.
+   */
+  customTheme: jsonb("custom_theme").$type<CustomTheme>(),
   convertToolResultsToToon: boolean("convert_tool_results_to_toon")
     .notNull()
     .default(true),

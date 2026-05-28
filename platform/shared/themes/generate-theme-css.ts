@@ -12,9 +12,16 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mapThemeFontValue } from "./font-token-map";
 // Import theme configuration
-import { SUPPORTED_THEMES } from "./theme-config";
+import { CUSTOM_THEME_ID, SUPPORTED_THEMES } from "./theme-config";
 import type { ThemeId } from "./theme-utils";
 import themeRegistry from "./tweakcn-themes.json";
+
+// Themes whose CSS variables are not authored in tweakcn-themes.json and must
+// not be emitted into the generated themes.css file. The `custom` theme is
+// stored per-organization in the database and injected at runtime.
+const RUNTIME_ONLY_THEMES: ReadonlySet<ThemeId> = new Set<ThemeId>([
+  CUSTOM_THEME_ID,
+]);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -109,8 +116,11 @@ function generateThemesCSS(): string {
  * Run: pnpm codegen:theme-css
  */\n`;
 
-  // Filter to only supported themes
-  const supportedThemeIds = new Set(SUPPORTED_THEMES);
+  // Filter to only supported themes that have a registry entry. The runtime-only
+  // themes (e.g. `custom`) are intentionally excluded here.
+  const supportedThemeIds = new Set(
+    SUPPORTED_THEMES.filter((id) => !RUNTIME_ONLY_THEMES.has(id)),
+  );
   const supportedThemes = (themeRegistry.items as ThemeItem[]).filter((item) =>
     supportedThemeIds.has(item.name as ThemeId),
   );
@@ -146,8 +156,11 @@ function main() {
   const css = generateThemesCSS();
   fs.writeFileSync(outputPath, css, "utf-8");
 
+  const emittedCount = SUPPORTED_THEMES.filter(
+    (id) => !RUNTIME_ONLY_THEMES.has(id),
+  ).length;
   console.log(`✅ Generated ${outputPath}`);
-  console.log(`📊 Generated ${SUPPORTED_THEMES.length} themes`);
+  console.log(`📊 Generated ${emittedCount} themes`);
 }
 
 main();

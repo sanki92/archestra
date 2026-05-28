@@ -1,4 +1,5 @@
 import {
+  CustomThemeSchema,
   EmbeddingDimensionsSchema,
   OAUTH_ACCESS_TOKEN_MAX_LIFETIME_SECONDS,
   OAUTH_ACCESS_TOKEN_MIN_LIFETIME_SECONDS,
@@ -258,6 +259,7 @@ export const OnboardingWizardSchema = z.object({
 export const AppearanceSettingsSchema = z.object({
   theme: OrganizationThemeSchema,
   customFont: OrganizationCustomFontSchema,
+  customTheme: CustomThemeSchema.nullable(),
   logo: z.string().nullable(),
   logoDark: z.string().nullable(),
   favicon: z.string().nullable(),
@@ -288,6 +290,7 @@ export const OAuthAccessTokenLifetimeSecondsSchema = z
 const extendedFields = {
   theme: OrganizationThemeSchema,
   customFont: OrganizationCustomFontSchema,
+  customTheme: CustomThemeSchema.nullable(),
   compressionScope: OrganizationCompressionScopeSchema,
   globalToolPolicy: GlobalToolPolicySchema,
   embeddingModel: z.string().nullable(),
@@ -330,6 +333,7 @@ export const InsertOrganizationSchema = createInsertSchema(
 export const UpdateAppearanceSettingsSchema = z.object({
   theme: OrganizationThemeSchema.optional(),
   customFont: OrganizationCustomFontSchema.optional(),
+  customTheme: CustomThemeSchema.nullable().optional(),
   logo: Base64LogoSchema.optional(),
   logoDark: Base64LogoSchema.optional(),
   favicon: Base64PngSchema.optional(),

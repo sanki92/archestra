@@ -18,6 +18,7 @@ describe("OrganizationModel", () => {
       expect(appearance).toEqual({
         theme: DEFAULT_THEME_ID,
         customFont: "lato",
+        customTheme: null,
         logo: null,
         logoDark: null,
         favicon: null,
@@ -44,6 +45,7 @@ describe("OrganizationModel", () => {
       expect(appearance).toEqual({
         theme: "cosmic-night",
         customFont: "lato",
+        customTheme: null,
         logo: null,
         logoDark: null,
         favicon: null,
@@ -151,6 +153,7 @@ describe("OrganizationModel", () => {
         "chatErrorSupportMessage",
         "chatLinks",
         "customFont",
+        "customTheme",
         "favicon",
         "footerText",
         "iconLogo",

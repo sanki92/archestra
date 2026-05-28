@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { SUPPORTED_THEMES } from "./theme-config";
+import { CUSTOM_THEME_ID, SUPPORTED_THEMES } from "./theme-config";
 import { getThemeById, getThemeMetadata } from "./theme-utils";
 
 describe("getThemeMetadata", () => {
@@ -21,5 +21,11 @@ describe("getThemeById", () => {
   test("returns undefined for an unknown id", () => {
     // @ts-expect-error — intentionally passing an invalid id
     expect(getThemeById("not-a-real-theme")).toBeUndefined();
+  });
+
+  test("returns a friendly name for the runtime-only custom theme", () => {
+    const meta = getThemeById(CUSTOM_THEME_ID);
+    expect(meta?.id).toBe(CUSTOM_THEME_ID);
+    expect(meta?.name).toBe("Custom");
   });
 });

@@ -145,6 +145,7 @@ class OrganizationModel {
       .select({
         theme: schema.organizationsTable.theme,
         customFont: schema.organizationsTable.customFont,
+        customTheme: schema.organizationsTable.customTheme,
         logo: schema.organizationsTable.logo,
         logoDark: schema.organizationsTable.logoDark,
         favicon: schema.organizationsTable.favicon,
@@ -169,6 +170,7 @@ class OrganizationModel {
       return {
         theme: DEFAULT_THEME_ID,
         customFont: "lato" as OrganizationCustomFont,
+        customTheme: null,
         logo: null,
         logoDark: null,
         favicon: null,

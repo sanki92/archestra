@@ -31,7 +31,16 @@ export const SUPPORTED_THEMES = [
   "dracula-dark",
   "monokai-dark",
   "moonlight-dark",
+  "custom",
 ] as const;
+
+/**
+ * Theme ID used for the per-organization custom theme.
+ * The CSS variables for this theme are stored in `organization.custom_theme`
+ * (JSON) and injected at runtime, so this ID has no entry in
+ * `tweakcn-themes.json` and is not emitted into `themes.css`.
+ */
+export const CUSTOM_THEME_ID = "custom";
 
 /**
  * Default theme ID

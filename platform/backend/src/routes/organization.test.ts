@@ -412,6 +412,77 @@ describe("organization routes", () => {
       expect(body.appName).toBe("Persistence Test");
       expect(body.footerText).toBe("Persistent Footer");
     });
+
+    test("stores and reads back customTheme JSON", async () => {
+      const customTheme = {
+        light: {
+          background: "oklch(1 0 0)",
+          foreground: "oklch(0.2 0 0)",
+          primary: "oklch(0.62 0.19 259)",
+        },
+        dark: {
+          background: "oklch(0.2 0 0)",
+          foreground: "oklch(0.92 0 0)",
+        },
+      };
+
+      const patch = await app.inject({
+        method: "PATCH",
+        url: "/api/organization/appearance-settings",
+        payload: { theme: "custom", customTheme },
+      });
+      expect(patch.statusCode).toBe(200);
+      expect(patch.json().theme).toBe("custom");
+      expect(patch.json().customTheme).toEqual(customTheme);
+
+      const get = await app.inject({
+        method: "GET",
+        url: "/api/organization/appearance-settings",
+      });
+      expect(get.statusCode).toBe(200);
+      expect(get.json().theme).toBe("custom");
+      expect(get.json().customTheme).toEqual(customTheme);
+    });
+
+    test("clears customTheme when set to null", async () => {
+      await app.inject({
+        method: "PATCH",
+        url: "/api/organization/appearance-settings",
+        payload: {
+          customTheme: { light: { background: "white" }, dark: {} },
+        },
+      });
+
+      const clear = await app.inject({
+        method: "PATCH",
+        url: "/api/organization/appearance-settings",
+        payload: { customTheme: null },
+      });
+      expect(clear.statusCode).toBe(200);
+      expect(clear.json().customTheme).toBeNull();
+    });
+
+    test("rejects customTheme with non-string values", async () => {
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/api/organization/appearance-settings",
+        payload: {
+          customTheme: { light: { background: 42 }, dark: {} },
+        },
+      });
+      expect(response.statusCode).toBe(400);
+    });
+
+    test("rejects customTheme missing the dark map", async () => {
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/api/organization/appearance-settings",
+        payload: {
+          customTheme: { light: { background: "white" } },
+        },
+      });
+      expect(response.statusCode).toBe(400);
+    });
   });
 
   describe("PATCH /api/organization/security-settings", () => {
