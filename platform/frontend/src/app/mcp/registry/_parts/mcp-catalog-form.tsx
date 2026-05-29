@@ -80,6 +80,8 @@ import {
   MCP_CONFIG_AUTOCOMPLETE,
   MCP_SECRET_AUTOCOMPLETE,
 } from "@/lib/mcp/mcp-form-autocomplete";
+import { useEnvironments } from "@/lib/organization/environment.query";
+import { useDefaultEnvironment } from "@/lib/organization.query";
 import { useGetSecret } from "@/lib/secrets.query";
 import { useTeams } from "@/lib/teams/team.query";
 import {
@@ -115,6 +117,11 @@ const ExternalSecretSelector = lazy(
     // biome-ignore lint/style/noRestrictedImports: lazy loading
     import("@/components/external-secret-selector.ee"),
 );
+
+// Sentinel value for the default environment option (null assignment). The shadcn
+// Select cannot use an empty-string item value, so a sentinel maps to `null`
+// (no environment assigned).
+const ENVIRONMENT_DEFAULT_VALUE = "__default__";
 
 interface McpCatalogFormProps {
   mode: "create" | "edit";
@@ -257,6 +264,7 @@ export function McpCatalogForm({
           },
           scope: "personal",
           teams: [],
+          environmentId: null,
         }),
   });
 
@@ -530,6 +538,8 @@ export function McpCatalogForm({
     mcpServerInstallation: ["admin"],
   });
   const { data: teams } = useTeams();
+  const { data: environments } = useEnvironments();
+  const defaultEnvironment = useDefaultEnvironment();
   const currentScope = form.watch("scope");
   const enterpriseAuthDisabledReason: ReactNode | null =
     !isEnterpriseCoreEnabled
@@ -872,6 +882,48 @@ export function McpCatalogForm({
                         )}
                       </VisibilitySelector>
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="environmentId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Environment</FormLabel>
+                    <Select
+                      value={field.value ?? ENVIRONMENT_DEFAULT_VALUE}
+                      onValueChange={(value) =>
+                        field.onChange(
+                          value === ENVIRONMENT_DEFAULT_VALUE ? null : value,
+                        )
+                      }
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={ENVIRONMENT_DEFAULT_VALUE}>
+                          {defaultEnvironment.name}
+                        </SelectItem>
+                        {environments?.map((environment) => (
+                          <SelectItem
+                            key={environment.id}
+                            value={environment.id}
+                          >
+                            {environment.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Catalog items with no environment use the{" "}
+                      {defaultEnvironment.name} environment.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

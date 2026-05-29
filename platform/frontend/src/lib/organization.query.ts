@@ -591,6 +591,51 @@ export function usePresetEntityName() {
 }
 
 /**
+ * Update the org-wide default environment (the implicit "Default" target that
+ * catalog items use when no environment is assigned). Unlike real environments,
+ * the default has no slug, so both its name and namespace are freely editable.
+ * Pass `name`/`namespace` (or null to reset to the built-in "Default").
+ */
+export function useUpdateDefaultEnvironment(
+  onSuccessMessage: string,
+  onErrorMessage: string,
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      data: archestraApiTypes.UpdateDefaultEnvironmentData["body"],
+    ) => {
+      const { data: updatedOrganization, error } =
+        await archestraApiSdk.updateDefaultEnvironment({ body: data });
+
+      if (error) {
+        toast.error(onErrorMessage);
+        return null;
+      }
+
+      return updatedOrganization;
+    },
+    onSuccess: (updatedOrganization) => {
+      if (!updatedOrganization) return;
+      queryClient.setQueryData(organizationKeys.details(), updatedOrganization);
+      toast.success(onSuccessMessage);
+    },
+  });
+}
+
+/**
+ * Returns the org-configured default environment (name + namespace). When
+ * unconfigured, `name` falls back to "Default" and `namespace` to null.
+ */
+export function useDefaultEnvironment() {
+  const { data: organization } = useOrganization();
+  return {
+    name: organization?.defaultEnvironmentName ?? "Default",
+    namespace: organization?.defaultEnvironmentNamespace ?? null,
+  };
+}
+
+/**
  * Update Auth settings (OAuth access token lifetime)
  */
 export function useUpdateAuthSettings(

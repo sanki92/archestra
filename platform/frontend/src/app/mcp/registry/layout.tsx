@@ -18,6 +18,9 @@ export default function McpCatalogLayout({
   const { data: canManageOrgStructure } = useHasPermissions({
     mcpServerInstallation: ["admin"],
   });
+  const { data: canManageEnvironments } = useHasPermissions({
+    environment: ["create", "update", "delete"],
+  });
 
   const tabs = [
     { label: "Catalog", href: "/mcp/registry" },
@@ -28,6 +31,9 @@ export default function McpCatalogLayout({
             href: "/mcp/registry/org-structure",
           },
         ]
+      : []),
+    ...(canManageEnvironments
+      ? [{ label: "Environments", href: "/mcp/registry/environments" }]
       : []),
   ];
 

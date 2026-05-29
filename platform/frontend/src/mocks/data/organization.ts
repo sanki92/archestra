@@ -59,6 +59,8 @@ export function makeOrganization(
     presetEntityNamePlural: null,
     presetEntityDefaultLabel: null,
     presetEntityDefaultValidationRegex: null,
+    defaultEnvironmentName: null,
+    defaultEnvironmentNamespace: null,
     ...overrides,
   };
 }

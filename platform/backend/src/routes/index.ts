@@ -11,6 +11,7 @@ export { default as autonomyPolicyRoutes } from "./autonomy-policies";
 export { default as chatRoutes } from "./chat/routes";
 export { default as chatopsRoutes } from "./chatops";
 export { default as configRoutes } from "./config";
+export { default as environmentRoutes } from "./environment";
 export { default as healthRoutes } from "./health";
 export { default as incomingEmailRoutes } from "./incoming-email";
 export { default as interactionRoutes } from "./interaction";

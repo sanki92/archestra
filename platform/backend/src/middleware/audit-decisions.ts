@@ -201,6 +201,10 @@ export const AUDIT_DECISIONS = {
     audited: false,
     reason: "preset definitions; static config, audited via catalog",
   },
+  environmentsTable: {
+    audited: false,
+    reason: "deployment environment definitions; static config, ungated",
+  },
 
   // =========================================================================
   // A2A protocol runtime

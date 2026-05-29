@@ -3,7 +3,7 @@ import {
   ARCHESTRA_MCP_SERVER_NAME,
   MCP_SERVER_TOOL_NAME_SEPARATOR,
 } from "@shared";
-import { InternalMcpCatalogModel } from "@/models";
+import { EnvironmentModel, InternalMcpCatalogModel } from "@/models";
 import { beforeEach, describe, expect, test } from "@/test";
 import type { Agent } from "@/types";
 import { type ArchestraContext, executeArchestraTool } from ".";
@@ -223,6 +223,61 @@ describe("mcp server tool execution", () => {
     );
     expect(createdCatalog?.serverType).toBe("remote");
     expect(createdCatalog?.serverUrl).toBe("https://example.com/mcp");
+  });
+
+  test("create_mcp_server persists environmentId", async () => {
+    const env = await EnvironmentModel.create({
+      organizationId,
+      name: "Production",
+    });
+
+    const result = await executeArchestraTool(
+      `${ARCHESTRA_MCP_SERVER_NAME}${MCP_SERVER_TOOL_NAME_SEPARATOR}create_mcp_server`,
+      {
+        name: "Server With Environment",
+        serverType: "remote",
+        serverUrl: "https://example.com/mcp",
+        environmentId: env.id,
+      },
+      mockContext,
+    );
+
+    expect(result.isError).toBe(false);
+
+    const createdCatalog = await InternalMcpCatalogModel.findByName(
+      "Server With Environment",
+    );
+    expect(createdCatalog?.environmentId).toBe(env.id);
+  });
+
+  test("edit_mcp_description updates the environmentId", async ({
+    makeInternalMcpCatalog,
+  }) => {
+    const env = await EnvironmentModel.create({
+      organizationId,
+      name: "Staging",
+    });
+    const catalog = await makeInternalMcpCatalog({
+      name: "Catalog To Move",
+      organizationId,
+    });
+    expect(catalog.environmentId).toBeNull();
+
+    const result = await executeArchestraTool(
+      `${ARCHESTRA_MCP_SERVER_NAME}${MCP_SERVER_TOOL_NAME_SEPARATOR}edit_mcp_description`,
+      {
+        id: catalog.id,
+        environmentId: env.id,
+      },
+      mockContext,
+    );
+
+    expect(result.isError).toBe(false);
+
+    const updatedCatalog = await InternalMcpCatalogModel.findById(catalog.id, {
+      expandSecrets: false,
+    });
+    expect(updatedCatalog?.environmentId).toBe(env.id);
   });
 
   test("edit_mcp_config updates persisted MCP server configuration", async ({

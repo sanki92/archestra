@@ -1,0 +1,375 @@
+"use client";
+
+import { Pencil, Plus, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  type EnvironmentWithAssignedCount,
+  useCreateEnvironment,
+  useDeleteEnvironment,
+  useEnvironments,
+  useUpdateEnvironment,
+} from "@/lib/organization/environment.query";
+import {
+  useDefaultEnvironment,
+  useUpdateDefaultEnvironment,
+} from "@/lib/organization.query";
+
+export function EnvironmentsSection({ canEdit }: { canEdit: boolean }) {
+  const { data: environments = [], isLoading } = useEnvironments();
+  const defaultEnvironment = useDefaultEnvironment();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editDefaultOpen, setEditDefaultOpen] = useState(false);
+  const [editTarget, setEditTarget] =
+    useState<EnvironmentWithAssignedCount | null>(null);
+  const [deleteTarget, setDeleteTarget] =
+    useState<EnvironmentWithAssignedCount | null>(null);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-sm text-muted-foreground">
+          Deployment environments let you assign catalog items to a target
+          Kubernetes namespace. Assigning an item to an environment is optional.
+        </p>
+        <Button
+          size="sm"
+          className="h-9 shrink-0 px-3 text-sm"
+          disabled={!canEdit}
+          onClick={() => setCreateOpen(true)}
+        >
+          <Plus className="h-4 w-4" />
+          Add Environment
+        </Button>
+      </div>
+
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Kubernetes namespace</TableHead>
+              <TableHead>Assigned items</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {/* The Default environment is a real, configurable target (stored
+                on the organization). It always renders first, cannot be
+                deleted, and — unlike real environments — has a freely editable
+                name (it has no slug). */}
+            <TableRow>
+              <TableCell className="font-medium">
+                {defaultEnvironment.name}
+              </TableCell>
+              <TableCell className="font-mono text-xs text-muted-foreground">
+                {defaultEnvironment.namespace ?? "—"}
+              </TableCell>
+              <TableCell className="text-muted-foreground">—</TableCell>
+              <TableCell className="text-right">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                  disabled={!canEdit}
+                  onClick={() => setEditDefaultOpen(true)}
+                  aria-label={`Edit ${defaultEnvironment.name}`}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              </TableCell>
+            </TableRow>
+            {isLoading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={4}
+                  className="text-center text-sm text-muted-foreground"
+                >
+                  Loading…
+                </TableCell>
+              </TableRow>
+            ) : (
+              environments.map((environment) => (
+                <TableRow key={environment.id}>
+                  <TableCell className="font-medium">
+                    {environment.name}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">
+                    {environment.namespace ?? "—"}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {environment.assignedCatalogCount}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      disabled={!canEdit}
+                      onClick={() => setEditTarget(environment)}
+                      aria-label={`Edit ${environment.name}`}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      disabled={!canEdit}
+                      onClick={() => setDeleteTarget(environment)}
+                      aria-label={`Delete ${environment.name}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        MCP servers are installed into the {defaultEnvironment.name} environment
+        unless assigned to another.
+      </p>
+
+      <EnvironmentEditorDialog
+        mode="create"
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        environment={null}
+      />
+
+      <EnvironmentEditorDialog
+        mode="edit"
+        open={editTarget !== null}
+        onOpenChange={(v) => !v && setEditTarget(null)}
+        environment={editTarget}
+      />
+
+      <EnvironmentEditorDialog
+        mode="default"
+        open={editDefaultOpen}
+        onOpenChange={setEditDefaultOpen}
+        environment={null}
+        defaultEnvironment={defaultEnvironment}
+      />
+
+      <DeleteEnvironmentDialog
+        target={deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+      />
+    </div>
+  );
+}
+
+function EnvironmentEditorDialog({
+  mode,
+  open,
+  onOpenChange,
+  environment,
+  defaultEnvironment,
+}: {
+  // "default" edits the org-level default environment (name + namespace both
+  // editable); "create"/"edit" manage real environments (name immutable after
+  // create, since the slug is derived from it).
+  mode: "create" | "edit" | "default";
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  environment: EnvironmentWithAssignedCount | null;
+  defaultEnvironment?: { name: string; namespace: string | null };
+}) {
+  const createMutation = useCreateEnvironment();
+  const updateMutation = useUpdateEnvironment();
+  const updateDefaultMutation = useUpdateDefaultEnvironment(
+    "Default environment updated",
+    "Failed to update default environment",
+  );
+
+  const [name, setName] = useState("");
+  const [namespace, setNamespace] = useState("");
+
+  // The default's name is freely editable; real environments lock it on edit.
+  const nameEditable = mode !== "edit";
+
+  // Sync drafts whenever the dialog (re)opens for a target.
+  useEffect(() => {
+    if (open) {
+      if (mode === "default") {
+        setName(defaultEnvironment?.name ?? "");
+        setNamespace(defaultEnvironment?.namespace ?? "");
+      } else {
+        setName(environment?.name ?? "");
+        setNamespace(environment?.namespace ?? "");
+      }
+    }
+  }, [open, mode, environment, defaultEnvironment]);
+
+  const isPending =
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    updateDefaultMutation.isPending;
+  const trimmedName = name.trim();
+  const trimmedNamespace = namespace.trim();
+  const canSave = mode === "edit" ? true : trimmedName.length > 0;
+
+  const handleSave = () => {
+    if (mode === "create") {
+      createMutation.mutate(
+        {
+          name: trimmedName,
+          namespace: trimmedNamespace === "" ? null : trimmedNamespace,
+        },
+        { onSuccess: (created) => created && onOpenChange(false) },
+      );
+    } else if (mode === "default") {
+      updateDefaultMutation.mutate(
+        {
+          name: trimmedName,
+          namespace: trimmedNamespace === "" ? null : trimmedNamespace,
+        },
+        { onSuccess: (updated) => updated && onOpenChange(false) },
+      );
+    } else if (environment) {
+      updateMutation.mutate(
+        {
+          id: environment.id,
+          body: {
+            namespace: trimmedNamespace === "" ? null : trimmedNamespace,
+          },
+        },
+        { onSuccess: (updated) => updated && onOpenChange(false) },
+      );
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {mode === "create"
+              ? "Add environment"
+              : mode === "default"
+                ? "Edit default environment"
+                : "Edit environment"}
+          </DialogTitle>
+          <DialogDescription>
+            {mode === "create"
+              ? "Create an org-level deployment environment."
+              : mode === "default"
+                ? "Update the name and Kubernetes namespace for the default environment."
+                : "Update the Kubernetes namespace for this environment."}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogBody className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="environment-name">
+              Name <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="environment-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Production"
+              maxLength={50}
+              disabled={!nameEditable || isPending}
+              readOnly={!nameEditable}
+            />
+            {mode === "edit" && (
+              <p className="text-xs text-muted-foreground">
+                The name cannot be changed after creation, since the slug is
+                derived from it.
+              </p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="environment-namespace">Kubernetes namespace</Label>
+            <Input
+              id="environment-namespace"
+              value={namespace}
+              onChange={(e) => setNamespace(e.target.value)}
+              placeholder="e.g. prod-eu"
+              maxLength={253}
+              disabled={isPending}
+            />
+          </div>
+        </DialogBody>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isPending}
+          >
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={!canSave || isPending}>
+            {isPending ? "Saving…" : "Save"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DeleteEnvironmentDialog({
+  target,
+  onClose,
+}: {
+  target: EnvironmentWithAssignedCount | null;
+  onClose: () => void;
+}) {
+  const deleteMutation = useDeleteEnvironment();
+
+  if (!target) return null;
+
+  return (
+    <DeleteConfirmDialog
+      open
+      onOpenChange={(open) => !open && onClose()}
+      title={`Delete ${target.name}?`}
+      description={
+        <div className="space-y-2 text-sm">
+          <p>Deleting this environment will:</p>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>
+              Unassign the {target.assignedCatalogCount} catalog item
+              {target.assignedCatalogCount === 1 ? "" : "s"} currently assigned
+              to <span className="font-medium">{target.name}</span>. They fall
+              back to the default environment.
+            </li>
+          </ul>
+          <p>This cannot be undone.</p>
+        </div>
+      }
+      isPending={deleteMutation.isPending}
+      pendingLabel="Deleting…"
+      onConfirm={() =>
+        deleteMutation.mutate(target.id, {
+          onSuccess: () => onClose(),
+        })
+      }
+    />
+  );
+}

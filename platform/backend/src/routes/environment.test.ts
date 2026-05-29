@@ -1,0 +1,149 @@
+import type { RouteId } from "@shared";
+import { requiredEndpointPermissionsMap } from "@shared/access-control";
+import { type Mock, vi } from "vitest";
+import type { FastifyInstanceWithZod } from "@/server";
+import { createFastifyInstance } from "@/server";
+import { afterEach, describe, expect, test } from "@/test";
+import { ApiError, type User } from "@/types";
+
+// Mirrors the harness in mcp-preset-entry.validation-regex.test.ts: the route
+// plugin is registered on its own, with `user`/`organizationId` injected via an
+// onRequest hook and `hasPermission` mocked. To exercise the real route ->
+// permission map wiring (and a genuine 403 for a non-permitted member), the hook
+// replicates the middleware's authorization gate using the actual
+// requiredEndpointPermissionsMap.
+vi.mock("@/auth", () => ({
+  hasPermission: vi.fn(),
+}));
+
+import { hasPermission } from "@/auth";
+
+const mockHasPermission = hasPermission as Mock;
+
+async function buildApp(user: User, organizationId: string) {
+  const app = createFastifyInstance();
+  app.addHook("onRequest", async (request) => {
+    (request as typeof request & { user: unknown }).user = user;
+    (request as typeof request & { organizationId: string }).organizationId =
+      organizationId;
+
+    const routeId = request.routeOptions.schema?.operationId as
+      | RouteId
+      | undefined;
+    const requiredPermissions = routeId
+      ? requiredEndpointPermissionsMap[routeId]
+      : undefined;
+    if (requiredPermissions && Object.keys(requiredPermissions).length > 0) {
+      const result = await hasPermission(requiredPermissions, request.headers);
+      if (!result.success) {
+        throw new ApiError(403, "Forbidden");
+      }
+    }
+  });
+
+  const { default: environmentRoutes } = await import("./environment");
+  await app.register(environmentRoutes);
+  return app;
+}
+
+describe("environment routes", () => {
+  let app: FastifyInstanceWithZod;
+  let organizationId: string;
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    if (app) await app.close();
+  });
+
+  test("admin can create, list, update, and delete an environment", async ({
+    makeUser,
+    makeOrganization,
+  }) => {
+    vi.clearAllMocks();
+    mockHasPermission.mockResolvedValue({ success: true, error: null });
+    const user = await makeUser();
+    const organization = await makeOrganization();
+    organizationId = organization.id;
+    app = await buildApp(user, organizationId);
+
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/organization/environments",
+      payload: { name: "Production", namespace: "prod" },
+    });
+    expect(created.statusCode).toBe(200);
+    const env = created.json();
+    expect(env.slug).toBe("production");
+    expect(env.namespace).toBe("prod");
+
+    const list = await app.inject({
+      method: "GET",
+      url: "/api/organization/environments",
+    });
+    expect(list.statusCode).toBe(200);
+    expect(list.json()).toHaveLength(1);
+    expect(list.json()[0].assignedCatalogCount).toBe(0);
+
+    const updated = await app.inject({
+      method: "PATCH",
+      url: `/api/organization/environments/${env.id}`,
+      payload: { namespace: "prod-eu" },
+    });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json().namespace).toBe("prod-eu");
+    expect(updated.json().name).toBe("Production");
+    expect(updated.json().slug).toBe("production");
+
+    const deleted = await app.inject({
+      method: "DELETE",
+      url: `/api/organization/environments/${env.id}`,
+    });
+    expect(deleted.statusCode).toBe(200);
+    expect(deleted.json().success).toBe(true);
+  });
+
+  test("member without environment:create is forbidden", async ({
+    makeUser,
+    makeOrganization,
+  }) => {
+    vi.clearAllMocks();
+    mockHasPermission.mockResolvedValue({
+      success: false,
+      error: new Error("Forbidden"),
+    });
+    const user = await makeUser();
+    const organization = await makeOrganization();
+    organizationId = organization.id;
+    app = await buildApp(user, organizationId);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/organization/environments",
+      payload: { name: "Nope" },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  test("duplicate name returns 409", async ({ makeUser, makeOrganization }) => {
+    vi.clearAllMocks();
+    mockHasPermission.mockResolvedValue({ success: true, error: null });
+    const user = await makeUser();
+    const organization = await makeOrganization();
+    organizationId = organization.id;
+    app = await buildApp(user, organizationId);
+
+    const payload = { name: "Staging" };
+    const first = await app.inject({
+      method: "POST",
+      url: "/api/organization/environments",
+      payload,
+    });
+    expect(first.statusCode).toBe(200);
+    const second = await app.inject({
+      method: "POST",
+      url: "/api/organization/environments",
+      payload,
+    });
+    expect(second.statusCode).toBe(409);
+  });
+});

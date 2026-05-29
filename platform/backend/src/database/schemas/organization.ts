@@ -231,6 +231,19 @@ const organizationsTable = pgTable("organization", {
   presetEntityDefaultLabel: text("preset_entity_default_label"),
 
   /**
+   * Display name of the implicit "default" environment (the deployment target
+   * referenced by internal_mcp_catalog.environment_id = null). NULL falls back
+   * to "Default" in the UI.
+   */
+  defaultEnvironmentName: text("default_environment_name"),
+
+  /**
+   * Kubernetes namespace for the implicit "default" environment. Stored only
+   * (not applied at deploy yet). NULL = unset.
+   */
+  defaultEnvironmentNamespace: text("default_environment_namespace"),
+
+  /**
    * When true, the Agent Skill tools (`list_skills`, `activate_skill`,
    * `read_skill_file`) are assigned to every agent in the org and added to all
    * new agents. Flipped on

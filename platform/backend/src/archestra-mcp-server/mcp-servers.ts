@@ -145,6 +145,11 @@ const CatalogMetadataToolSchema = z
       .array(UuidIdSchema)
       .optional()
       .describe("Team IDs for team-scoped access control."),
+    environmentId: UuidIdSchema.nullable()
+      .optional()
+      .describe(
+        "ID of the environment this server belongs to. Omit (or pass null) to leave it in the default environment.",
+      ),
   })
   .strict();
 
@@ -696,6 +701,7 @@ async function handleEditMcpDescription(
       "scope",
       "labels",
       "teams",
+      "environmentId",
     ] as const;
 
     const updateData: Record<string, unknown> = {};
@@ -966,6 +972,8 @@ async function handleCreateMcpServer(
     }
     if (args.userConfig !== undefined)
       createParams.userConfig = args.userConfig;
+    if (args.environmentId !== undefined)
+      createParams.environmentId = args.environmentId;
     if (labels) createParams.labels = labels;
     if (teams.length > 0) createParams.teams = teams;
 
