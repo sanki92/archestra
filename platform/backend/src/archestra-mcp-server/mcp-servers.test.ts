@@ -4,6 +4,7 @@ import {
   MCP_SERVER_TOOL_NAME_SEPARATOR,
 } from "@shared";
 import { EnvironmentModel, InternalMcpCatalogModel } from "@/models";
+import { createEnvironment } from "@/services/environments/environment";
 import { beforeEach, describe, expect, test } from "@/test";
 import type { Agent } from "@/types";
 import { type ArchestraContext, executeArchestraTool } from ".";
@@ -685,5 +686,102 @@ describe("deploy_mcp_server", () => {
     expect((result.content[0] as any).text).toContain(
       "teamId should not be provided for non-team MCP server installations",
     );
+  });
+});
+
+/**
+ * create_mcp_server must refuse to assign a *restricted* environment unless the
+ * caller holds `environment:admin`. This mirrors the REST guard
+ * (internal-mcp-catalog.restricted-environment.test.ts) but exercises the MCP
+ * tool path, which uses the real `userHasPermission` against the caller's
+ * member role: the built-in Admin role holds `environment:admin`, a plain
+ * member does not. Personal-scope create (the default) needs no
+ * `mcpServerInstallation:admin`, so a plain member can reach the environment
+ * gate.
+ */
+describe("create_mcp_server restricted environment guard", () => {
+  const CREATE_TOOL = `${ARCHESTRA_MCP_SERVER_NAME}${MCP_SERVER_TOOL_NAME_SEPARATOR}create_mcp_server`;
+
+  test("non-env-admin member assigning a RESTRICTED env is rejected and nothing is created", async ({
+    makeAgent,
+    makeCustomRole,
+    makeUser,
+    makeOrganization,
+    makeMember,
+  }) => {
+    const org = await makeOrganization();
+    const user = await makeUser();
+    // A role that can create registry entries (so it passes the centralized
+    // tool RBAC gate and a personal-scope create) but lacks `environment:admin`.
+    const role = await makeCustomRole(org.id, {
+      permission: { mcpRegistry: ["create"] },
+    });
+    await makeMember(user.id, org.id, { role: role.role });
+    const agent = await makeAgent({ organizationId: org.id });
+    const ctx: ArchestraContext = {
+      agent: { id: agent.id, name: agent.name },
+      userId: user.id,
+      organizationId: org.id,
+    };
+    const restricted = await createEnvironment({
+      organizationId: org.id,
+      data: { name: "Prod", restricted: true },
+    });
+
+    const serverName = `restricted-env-rejected-${crypto.randomUUID().slice(0, 8)}`;
+    const result = await executeArchestraTool(
+      CREATE_TOOL,
+      {
+        name: serverName,
+        serverType: "remote",
+        serverUrl: "https://example.com/mcp",
+        environmentId: restricted.id,
+      },
+      ctx,
+    );
+
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as any).text).toContain("restricted environment");
+
+    const created = await InternalMcpCatalogModel.findByName(serverName);
+    expect(created).toBeFalsy();
+  });
+
+  test("env-admin (built-in Admin) assigning a RESTRICTED env succeeds", async ({
+    makeAgent,
+    makeUser,
+    makeOrganization,
+    makeMember,
+  }) => {
+    const org = await makeOrganization();
+    const user = await makeUser();
+    await makeMember(user.id, org.id, { role: "admin" });
+    const agent = await makeAgent({ organizationId: org.id });
+    const ctx: ArchestraContext = {
+      agent: { id: agent.id, name: agent.name },
+      userId: user.id,
+      organizationId: org.id,
+    };
+    const restricted = await createEnvironment({
+      organizationId: org.id,
+      data: { name: "Prod", restricted: true },
+    });
+
+    const serverName = `restricted-env-allowed-${crypto.randomUUID().slice(0, 8)}`;
+    const result = await executeArchestraTool(
+      CREATE_TOOL,
+      {
+        name: serverName,
+        serverType: "remote",
+        serverUrl: "https://example.com/mcp",
+        environmentId: restricted.id,
+      },
+      ctx,
+    );
+
+    expect(result.isError).toBe(false);
+
+    const created = await InternalMcpCatalogModel.findByName(serverName);
+    expect(created?.environmentId).toBe(restricted.id);
   });
 });

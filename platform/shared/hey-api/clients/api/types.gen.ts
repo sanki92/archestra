@@ -23199,6 +23199,7 @@ export type ListEnvironmentsResponses = {
         description: string | null;
         slug: string;
         namespace: string | null;
+        restricted: boolean;
         sortOrder: number;
         createdAt: string;
         updatedAt: string;
@@ -23213,6 +23214,7 @@ export type CreateEnvironmentData = {
         name: string;
         description?: string | null;
         namespace?: string | null;
+        restricted?: boolean;
     };
     path?: never;
     query?: never;
@@ -23295,6 +23297,7 @@ export type CreateEnvironmentResponses = {
         description: string | null;
         slug: string;
         namespace: string | null;
+        restricted: boolean;
         sortOrder: number;
         createdAt: string;
         updatedAt: string;
@@ -23392,6 +23395,7 @@ export type UpdateEnvironmentData = {
     body: {
         description?: string | null;
         namespace?: string | null;
+        restricted?: boolean;
     };
     path: {
         id: string;
@@ -23476,6 +23480,7 @@ export type UpdateEnvironmentResponses = {
         description: string | null;
         slug: string;
         namespace: string | null;
+        restricted: boolean;
         sortOrder: number;
         createdAt: string;
         updatedAt: string;

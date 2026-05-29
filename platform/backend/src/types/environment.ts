@@ -21,6 +21,7 @@ export const CreateEnvironmentSchema = z.object({
   name: z.string().trim().min(1).max(50),
   description: z.string().trim().max(500).nullable().optional(),
   namespace: z.string().trim().max(253).nullable().optional(),
+  restricted: z.boolean().optional(),
 });
 
 /**
@@ -30,6 +31,7 @@ export const CreateEnvironmentSchema = z.object({
 export const UpdateEnvironmentSchema = z.object({
   description: z.string().trim().max(500).nullable().optional(),
   namespace: z.string().trim().max(253).nullable().optional(),
+  restricted: z.boolean().optional(),
 });
 
 export type Environment = z.infer<typeof SelectEnvironmentSchema>;

@@ -539,6 +539,9 @@ export function McpCatalogForm({
   });
   const { data: teams } = useTeams();
   const { data: environments } = useEnvironments();
+  const { data: canDeployRestricted } = useHasPermissions({
+    environment: ["admin"],
+  });
   const defaultEnvironment = useDefaultEnvironment();
   const currentScope = form.watch("scope");
   const enterpriseAuthDisabledReason: ReactNode | null =
@@ -903,11 +906,20 @@ export function McpCatalogForm({
                             label: defaultEnvironment.name,
                             description: defaultEnvironment.description ?? "",
                           },
-                          ...(environments?.map((environment) => ({
-                            value: environment.id,
-                            label: environment.name,
-                            description: environment.description ?? "",
-                          })) ?? []),
+                          ...(environments?.map((environment) => {
+                            const locked =
+                              environment.restricted && !canDeployRestricted;
+                            return {
+                              value: environment.id,
+                              label: environment.name,
+                              description: environment.description ?? "",
+                              disabled: locked,
+                              disabledLabel: locked ? "Restricted" : undefined,
+                              disabledReason: locked
+                                ? "Requires the “Assign catalog items to restricted environments” permission."
+                                : undefined,
+                            };
+                          }) ?? []),
                         ]}
                         onValueChange={(value) =>
                           field.onChange(

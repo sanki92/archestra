@@ -10,6 +10,7 @@ interface EnvironmentWithAssignedCount {
   description: string | null;
   slug: string;
   namespace: string | null;
+  restricted: boolean;
   sortOrder: number;
   createdAt: Date;
   updatedAt: Date;
@@ -28,6 +29,7 @@ class EnvironmentModel {
         description: schema.environmentsTable.description,
         slug: schema.environmentsTable.slug,
         namespace: schema.environmentsTable.namespace,
+        restricted: schema.environmentsTable.restricted,
         sortOrder: schema.environmentsTable.sortOrder,
         createdAt: schema.environmentsTable.createdAt,
         updatedAt: schema.environmentsTable.updatedAt,
@@ -71,8 +73,9 @@ class EnvironmentModel {
     name: string;
     description?: string | null;
     namespace?: string | null;
+    restricted?: boolean;
   }): Promise<typeof schema.environmentsTable.$inferSelect> {
-    const { organizationId, name, description, namespace } = params;
+    const { organizationId, name, description, namespace, restricted } = params;
     const [row] = await db
       .insert(schema.environmentsTable)
       .values({
@@ -81,6 +84,7 @@ class EnvironmentModel {
         description: description ?? null,
         slug: await EnvironmentModel.uniqueSlug(organizationId, name),
         namespace: namespace ?? null,
+        restricted: restricted ?? false,
         sortOrder: await EnvironmentModel.nextSortOrder(organizationId),
       })
       .returning();
@@ -92,11 +96,13 @@ class EnvironmentModel {
     organizationId: string;
     description?: string | null;
     namespace?: string | null;
+    restricted?: boolean;
   }): Promise<typeof schema.environmentsTable.$inferSelect | null> {
-    const { id, organizationId, description, namespace } = params;
+    const { id, organizationId, description, namespace, restricted } = params;
     const patch: Record<string, unknown> = {};
     if (description !== undefined) patch.description = description;
     if (namespace !== undefined) patch.namespace = namespace;
+    if (restricted !== undefined) patch.restricted = restricted;
 
     const [row] = await db
       .update(schema.environmentsTable)

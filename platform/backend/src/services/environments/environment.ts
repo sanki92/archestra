@@ -29,6 +29,7 @@ export async function createEnvironment(params: {
     name: data.name,
     description: data.description ?? null,
     namespace: data.namespace ?? null,
+    restricted: data.restricted,
   });
 }
 
@@ -43,11 +44,42 @@ export async function updateEnvironment(params: {
     organizationId,
     description: data.description,
     namespace: data.namespace,
+    restricted: data.restricted,
   });
   if (!updated) {
     throw new ApiError(404, "Environment not found");
   }
   return updated;
+}
+
+/**
+ * Gate assigning a catalog item to an environment. The default (null)
+ * environment and unrestricted environments are open; a `restricted`
+ * environment requires the caller to hold `environment:admin`. Callers compute
+ * `hasEnvironmentAdmin` with their own auth primitive (route headers vs. MCP
+ * user context) and pass the result in, so this stays free of HTTP concerns.
+ */
+export async function assertCanAssignEnvironment(params: {
+  environmentId: string | null | undefined;
+  organizationId: string;
+  hasEnvironmentAdmin: boolean;
+}): Promise<void> {
+  const { environmentId, organizationId, hasEnvironmentAdmin } = params;
+  if (!environmentId) return;
+
+  const environment = await EnvironmentModel.findByIdForOrganization(
+    environmentId,
+    organizationId,
+  );
+  if (!environment) {
+    throw new ApiError(404, "Environment not found");
+  }
+  if (environment.restricted && !hasEnvironmentAdmin) {
+    throw new ApiError(
+      403,
+      "You do not have permission to assign catalog items to this restricted environment.",
+    );
+  }
 }
 
 export async function deleteEnvironment(params: {

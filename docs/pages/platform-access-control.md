@@ -146,6 +146,7 @@ The following table lists all available permissions that can be assigned to cust
 | `environment:create` | Create deployment environments |
 | `environment:update` | Modify deployment environment namespace |
 | `environment:delete` | Delete deployment environments |
+| `environment:admin` | Assign catalog items to restricted environments |
 | `identityProvider:read` | View identity provider configurations (SSO) |
 | `identityProvider:create` | Set up new identity providers |
 | `identityProvider:update` | Modify identity provider settings |

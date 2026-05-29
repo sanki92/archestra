@@ -3,6 +3,7 @@
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -68,6 +70,7 @@ export function EnvironmentsSection({ canEdit }: { canEdit: boolean }) {
               <TableHead>Description</TableHead>
               <TableHead>Kubernetes namespace</TableHead>
               <TableHead>Assigned items</TableHead>
+              <TableHead>Access</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -87,6 +90,7 @@ export function EnvironmentsSection({ canEdit }: { canEdit: boolean }) {
                 {defaultEnvironment.namespace ?? "—"}
               </TableCell>
               <TableCell className="text-muted-foreground">—</TableCell>
+              <TableCell className="text-muted-foreground">—</TableCell>
               <TableCell className="text-right">
                 <Button
                   variant="ghost"
@@ -103,7 +107,7 @@ export function EnvironmentsSection({ canEdit }: { canEdit: boolean }) {
             {isLoading ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="text-center text-sm text-muted-foreground"
                 >
                   Loading…
@@ -123,6 +127,13 @@ export function EnvironmentsSection({ canEdit }: { canEdit: boolean }) {
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {environment.assignedCatalogCount}
+                  </TableCell>
+                  <TableCell>
+                    {environment.restricted ? (
+                      <Badge variant="secondary">Restricted</Badge>
+                    ) : (
+                      <span className="text-muted-foreground">Open</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button
@@ -213,6 +224,7 @@ function EnvironmentEditorDialog({
   const [name, setName] = useState("");
   const [namespace, setNamespace] = useState("");
   const [description, setDescription] = useState("");
+  const [restricted, setRestricted] = useState(false);
 
   // The default's name is freely editable; real environments lock it on edit.
   const nameEditable = mode !== "edit";
@@ -228,6 +240,7 @@ function EnvironmentEditorDialog({
         setName(environment?.name ?? "");
         setNamespace(environment?.namespace ?? "");
         setDescription(environment?.description ?? "");
+        setRestricted(environment?.restricted ?? false);
       }
     }
   }, [open, mode, environment, defaultEnvironment]);
@@ -252,6 +265,7 @@ function EnvironmentEditorDialog({
           name: trimmedName,
           namespace: namespaceValue,
           description: descriptionValue,
+          restricted,
         },
         { onSuccess: (created) => created && onOpenChange(false) },
       );
@@ -271,6 +285,7 @@ function EnvironmentEditorDialog({
           body: {
             namespace: namespaceValue,
             description: descriptionValue,
+            restricted,
           },
         },
         { onSuccess: (updated) => updated && onOpenChange(false) },
@@ -341,6 +356,23 @@ function EnvironmentEditorDialog({
               disabled={isPending}
             />
           </div>
+          {mode !== "default" && (
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="environment-restricted">Restricted</Label>
+                <p className="text-xs text-muted-foreground">
+                  Only members with the “Assign catalog items to restricted
+                  environments” permission can assign catalog items here.
+                </p>
+              </div>
+              <Switch
+                id="environment-restricted"
+                checked={restricted}
+                onCheckedChange={setRestricted}
+                disabled={isPending}
+              />
+            </div>
+          )}
         </DialogBody>
         <DialogFooter>
           <Button

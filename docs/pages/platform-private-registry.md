@@ -82,6 +82,8 @@ For example, every catalog entry tagged `department: finance` is automatically w
 
 An environment is an organization-level deployment target — for example `sandbox`, `staging`, or `production`. Admins manage the list of environments, and each carries a name and an optional Kubernetes namespace. The registry form lets you assign a catalog entry to one environment.
 
+An environment can be marked **restricted**. Only members with the `environment:admin` permission can assign catalog entries to a restricted environment; in the registry form it appears disabled for everyone else. Unrestricted environments and Default stay open to anyone who can create catalog entries.
+
 Every entry starts on the virtual **Default** environment, which is not a stored row — it simply means "no environment assigned". Selecting Default in the registry form clears the assignment. Deleting an environment moves its entries back to Default rather than removing them.
 
 The Kubernetes namespace is recorded on the environment but is not yet applied when servers deploy.

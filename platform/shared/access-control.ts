@@ -46,7 +46,7 @@ export const allAvailableActions: Record<Resource, Action[]> = {
   mcpRegistry: ["read", "create", "update", "delete"],
   mcpServerInstallation: ["read", "create", "update", "delete", "admin"],
   mcpServerInstallationRequest: ["read", "create", "update", "delete", "admin"],
-  environment: ["read", "create", "update", "delete"],
+  environment: ["read", "create", "update", "delete", "admin"],
 
   // Knowledge
   knowledgeFile: ["read", "create", "update", "delete", "admin"],
@@ -286,6 +286,7 @@ export const permissionDescriptions: Record<string, string> = {
   "environment:create": "Create deployment environments",
   "environment:update": "Modify deployment environment namespace",
   "environment:delete": "Delete deployment environments",
+  "environment:admin": "Assign catalog items to restricted environments",
 
   // LLM
   "llmProxy:read": "View and list LLM proxies",

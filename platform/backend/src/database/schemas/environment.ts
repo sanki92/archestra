@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   integer,
   pgTable,
@@ -33,6 +34,13 @@ const environmentsTable = pgTable(
      * not yet applied at deployment time. NULL means "unset".
      */
     namespace: text("namespace"),
+    /**
+     * When true, assigning a catalog item to this environment requires the
+     * `environment:admin` permission. Unrestricted environments (and the
+     * org-default/null environment) are open to anyone who can create catalog
+     * items. Flipped via PATCH /api/organization/environments/:id.
+     */
+    restricted: boolean("restricted").notNull().default(false),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { mode: "date" })

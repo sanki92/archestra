@@ -24,6 +24,7 @@ import {
   TeamModel,
   ToolModel,
 } from "@/models";
+import { assertCanAssignEnvironment } from "@/services/environments/environment";
 import {
   InsertInternalMcpCatalogSchema,
   type InternalMcpCatalog,
@@ -893,6 +894,24 @@ async function handleCreateMcpServer(
 
     if (!context.userId || !organizationId) {
       return errorResult("user/organization context not available.");
+    }
+
+    try {
+      const hasEnvironmentAdmin = await userHasPermission(
+        context.userId,
+        organizationId,
+        "environment",
+        "admin",
+      );
+      await assertCanAssignEnvironment({
+        environmentId: args.environmentId ?? null,
+        organizationId,
+        hasEnvironmentAdmin,
+      });
+    } catch (error) {
+      return errorResult(
+        error instanceof Error ? error.message : "Failed to assign environment",
+      );
     }
 
     const serverType = args.serverType ?? "local";

@@ -26,6 +26,7 @@ import {
   ToolModel,
 } from "@/models";
 import { isByosEnabled, secretManager } from "@/secrets-manager";
+import { assertCanAssignEnvironment } from "@/services/environments/environment";
 import {
   autoReinstallServer,
   localExecutionConfigChanged,
@@ -188,6 +189,19 @@ const internalMcpCatalogRoutes: FastifyPluginAsyncZod = async (fastify) => {
       if (restBody.scope !== "team") {
         delete restBody.teams;
       }
+
+      // Gate assigning a restricted environment. Built-in Admin holds
+      // environment:admin via ...allAvailableActions; custom roles can be
+      // granted it. Unrestricted and default (null) environments are open.
+      const { success: hasEnvironmentAdmin } = await hasPermission(
+        { environment: ["admin"] },
+        request.headers,
+      );
+      await assertCanAssignEnvironment({
+        environmentId: restBody.environmentId ?? null,
+        organizationId: request.organizationId,
+        hasEnvironmentAdmin,
+      });
 
       let clientSecretId: string | undefined;
       let localConfigSecretId: string | undefined;
