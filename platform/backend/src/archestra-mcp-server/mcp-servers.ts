@@ -331,7 +331,7 @@ const EditMcpDescriptionToolArgsSchema = z
       `The catalog ID of the MCP server to edit. Use ${TOOL_GET_MCP_SERVERS_SHORT_NAME} to look it up by name.`,
     ),
   })
-  .merge(CatalogMetadataToolSchema.partial())
+  .merge(CatalogMetadataToolSchema.omit({ environmentId: true }).partial())
   .strict();
 
 const EditMcpConfigToolArgsSchema = z
@@ -701,7 +701,6 @@ async function handleEditMcpDescription(
       "scope",
       "labels",
       "teams",
-      "environmentId",
     ] as const;
 
     const updateData: Record<string, unknown> = {};

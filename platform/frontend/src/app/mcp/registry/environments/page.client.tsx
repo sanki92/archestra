@@ -10,13 +10,7 @@ export default function EnvironmentsPageClient() {
 
   return (
     <div className="space-y-4">
-      <div className="space-y-1">
-        <h2 className="text-lg font-semibold">Environments</h2>
-        <p className="text-sm text-muted-foreground">
-          Deployment environments for catalog items. The Kubernetes namespace is
-          stored but not yet applied at deploy time.
-        </p>
-      </div>
+      <h2 className="text-lg font-semibold">Environments</h2>
 
       <EnvironmentsSection canEdit={canEdit ?? false} />
     </div>

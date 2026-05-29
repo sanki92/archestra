@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, count, eq, sql } from "drizzle-orm";
 import db, { schema } from "@/database";
 
 // === Public API ===
@@ -29,14 +29,18 @@ class EnvironmentModel {
         sortOrder: schema.environmentsTable.sortOrder,
         createdAt: schema.environmentsTable.createdAt,
         updatedAt: schema.environmentsTable.updatedAt,
-        assignedCatalogCount: sql<number>`(
-          SELECT COUNT(*)::int
-          FROM ${schema.internalMcpCatalogTable}
-          WHERE ${schema.internalMcpCatalogTable.environmentId} = ${schema.environmentsTable.id}
-        )`,
+        assignedCatalogCount: count(schema.internalMcpCatalogTable.id),
       })
       .from(schema.environmentsTable)
+      .leftJoin(
+        schema.internalMcpCatalogTable,
+        eq(
+          schema.internalMcpCatalogTable.environmentId,
+          schema.environmentsTable.id,
+        ),
+      )
       .where(eq(schema.environmentsTable.organizationId, organizationId))
+      .groupBy(schema.environmentsTable.id)
       .orderBy(
         asc(schema.environmentsTable.sortOrder),
         asc(schema.environmentsTable.createdAt),

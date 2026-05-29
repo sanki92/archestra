@@ -47,11 +47,7 @@ export function EnvironmentsSection({ canEdit }: { canEdit: boolean }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-sm text-muted-foreground">
-          Deployment environments let you assign catalog items to a target
-          Kubernetes namespace. Assigning an item to an environment is optional.
-        </p>
+      <div className="flex items-center justify-end gap-4">
         <Button
           size="sm"
           className="h-9 shrink-0 px-3 text-sm"
@@ -148,11 +144,6 @@ export function EnvironmentsSection({ canEdit }: { canEdit: boolean }) {
           </TableBody>
         </Table>
       </div>
-
-      <p className="text-xs text-muted-foreground">
-        MCP servers are installed into the {defaultEnvironment.name} environment
-        unless assigned to another.
-      </p>
 
       <EnvironmentEditorDialog
         mode="create"

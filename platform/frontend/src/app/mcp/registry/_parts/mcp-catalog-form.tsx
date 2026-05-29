@@ -894,6 +894,7 @@ export function McpCatalogForm({
                   <FormItem>
                     <FormLabel>Environment</FormLabel>
                     <Select
+                      disabled={mode === "edit"}
                       value={field.value ?? ENVIRONMENT_DEFAULT_VALUE}
                       onValueChange={(value) =>
                         field.onChange(
@@ -921,8 +922,9 @@ export function McpCatalogForm({
                       </SelectContent>
                     </Select>
                     <FormDescription>
-                      Catalog items with no environment use the{" "}
-                      {defaultEnvironment.name} environment.
+                      {mode === "edit"
+                        ? "The environment can't be changed after creation."
+                        : `Catalog items with no environment use the ${defaultEnvironment.name} environment.`}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

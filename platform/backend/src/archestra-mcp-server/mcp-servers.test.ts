@@ -250,7 +250,7 @@ describe("mcp server tool execution", () => {
     expect(createdCatalog?.environmentId).toBe(env.id);
   });
 
-  test("edit_mcp_description updates the environmentId", async ({
+  test("edit_mcp_description cannot change the environmentId", async ({
     makeInternalMcpCatalog,
   }) => {
     const env = await EnvironmentModel.create({
@@ -272,12 +272,14 @@ describe("mcp server tool execution", () => {
       mockContext,
     );
 
-    expect(result.isError).toBe(false);
+    // The edit tool's args schema is strict and no longer accepts
+    // environmentId, so the call is rejected and the environment is unchanged.
+    expect(result.isError).toBe(true);
 
     const updatedCatalog = await InternalMcpCatalogModel.findById(catalog.id, {
       expandSecrets: false,
     });
-    expect(updatedCatalog?.environmentId).toBe(env.id);
+    expect(updatedCatalog?.environmentId).toBeNull();
   });
 
   test("edit_mcp_config updates persisted MCP server configuration", async ({
