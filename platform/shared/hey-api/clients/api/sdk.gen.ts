@@ -1808,7 +1808,7 @@ export const createEnvironment = <ThrowOnError extends boolean = false>(options:
 export const deleteEnvironment = <ThrowOnError extends boolean = false>(options: Options<DeleteEnvironmentData, ThrowOnError>) => (options.client ?? client).delete<DeleteEnvironmentResponses, DeleteEnvironmentErrors, ThrowOnError>({ url: '/api/organization/environments/{id}', ...options });
 
 /**
- * Update an environment's namespace. Name and slug are immutable.
+ * Update an environment's description and namespace. Name and slug are immutable.
  *
  * Authentication:
  *

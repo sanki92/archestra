@@ -63,7 +63,7 @@ const environmentRoutes: FastifyPluginAsyncZod = async (fastify) => {
       schema: {
         operationId: RouteId.UpdateEnvironment,
         description:
-          "Update an environment's namespace. Name and slug are immutable.",
+          "Update an environment's description and namespace. Name and slug are immutable.",
         tags: ["Organization"],
         params: z.object({ id: UuidIdSchema }),
         body: UpdateEnvironmentSchema,

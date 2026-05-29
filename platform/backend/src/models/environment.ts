@@ -7,6 +7,7 @@ interface EnvironmentWithAssignedCount {
   id: string;
   organizationId: string;
   name: string;
+  description: string | null;
   slug: string;
   namespace: string | null;
   sortOrder: number;
@@ -24,6 +25,7 @@ class EnvironmentModel {
         id: schema.environmentsTable.id,
         organizationId: schema.environmentsTable.organizationId,
         name: schema.environmentsTable.name,
+        description: schema.environmentsTable.description,
         slug: schema.environmentsTable.slug,
         namespace: schema.environmentsTable.namespace,
         sortOrder: schema.environmentsTable.sortOrder,
@@ -67,14 +69,16 @@ class EnvironmentModel {
   static async create(params: {
     organizationId: string;
     name: string;
+    description?: string | null;
     namespace?: string | null;
   }): Promise<typeof schema.environmentsTable.$inferSelect> {
-    const { organizationId, name, namespace } = params;
+    const { organizationId, name, description, namespace } = params;
     const [row] = await db
       .insert(schema.environmentsTable)
       .values({
         organizationId,
         name,
+        description: description ?? null,
         slug: await EnvironmentModel.uniqueSlug(organizationId, name),
         namespace: namespace ?? null,
         sortOrder: await EnvironmentModel.nextSortOrder(organizationId),
@@ -86,10 +90,12 @@ class EnvironmentModel {
   static async update(params: {
     id: string;
     organizationId: string;
+    description?: string | null;
     namespace?: string | null;
   }): Promise<typeof schema.environmentsTable.$inferSelect | null> {
-    const { id, organizationId, namespace } = params;
+    const { id, organizationId, description, namespace } = params;
     const patch: Record<string, unknown> = {};
+    if (description !== undefined) patch.description = description;
     if (namespace !== undefined) patch.namespace = namespace;
 
     const [row] = await db

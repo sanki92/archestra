@@ -892,40 +892,30 @@ export function McpCatalogForm({
                 name="environmentId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Environment</FormLabel>
-                    <Select
-                      disabled={mode === "edit"}
-                      value={field.value ?? ENVIRONMENT_DEFAULT_VALUE}
-                      onValueChange={(value) =>
-                        field.onChange(
-                          value === ENVIRONMENT_DEFAULT_VALUE ? null : value,
-                        )
-                      }
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value={ENVIRONMENT_DEFAULT_VALUE}>
-                          {defaultEnvironment.name}
-                        </SelectItem>
-                        {environments?.map((environment) => (
-                          <SelectItem
-                            key={environment.id}
-                            value={environment.id}
-                          >
-                            {environment.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      {mode === "edit"
-                        ? "The environment can't be changed after creation."
-                        : `Catalog items with no environment use the ${defaultEnvironment.name} environment.`}
-                    </FormDescription>
+                    <FormControl>
+                      <VisibilitySelector
+                        label="Environment"
+                        readOnly={mode === "edit"}
+                        value={field.value ?? ENVIRONMENT_DEFAULT_VALUE}
+                        options={[
+                          {
+                            value: ENVIRONMENT_DEFAULT_VALUE,
+                            label: defaultEnvironment.name,
+                            description: defaultEnvironment.description ?? "",
+                          },
+                          ...(environments?.map((environment) => ({
+                            value: environment.id,
+                            label: environment.name,
+                            description: environment.description ?? "",
+                          })) ?? []),
+                        ]}
+                        onValueChange={(value) =>
+                          field.onChange(
+                            value === ENVIRONMENT_DEFAULT_VALUE ? null : value,
+                          )
+                        }
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

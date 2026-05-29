@@ -454,6 +454,7 @@ export const UpdatePresetEntityDefaultValidationRegexSchema = z.object({
  */
 export const UpdateDefaultEnvironmentSchema = z.object({
   name: z.string().trim().min(1).max(50).nullable().optional(),
+  description: z.string().trim().max(500).nullable().optional(),
   namespace: z.string().trim().max(253).nullable().optional(),
 });
 

@@ -244,6 +244,12 @@ const organizationsTable = pgTable("organization", {
   defaultEnvironmentNamespace: text("default_environment_namespace"),
 
   /**
+   * Optional human-readable description of the implicit "default" environment,
+   * shown in the environment selector. NULL = unset.
+   */
+  defaultEnvironmentDescription: text("default_environment_description"),
+
+  /**
    * When true, the Agent Skill tools (`list_skills`, `activate_skill`,
    * `read_skill_file`) are assigned to every agent in the org and added to all
    * new agents. Flipped on

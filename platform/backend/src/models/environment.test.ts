@@ -10,10 +10,12 @@ describe("EnvironmentModel", () => {
     const env = await EnvironmentModel.create({
       organizationId: org.id,
       name: "Production EU",
+      description: "Primary EU deployment target",
       namespace: "prod-eu",
     });
 
     expect(env.name).toBe("Production EU");
+    expect(env.description).toBe("Primary EU deployment target");
     expect(env.slug).toBe("production-eu");
     expect(env.namespace).toBe("prod-eu");
   });
@@ -45,7 +47,21 @@ describe("EnvironmentModel", () => {
     const list = await EnvironmentModel.listForOrganization(org.id);
     expect(list).toHaveLength(1);
     expect(list[0].id).toBe(env.id);
+    expect(list[0].description).toBeNull();
     expect(list[0].assignedCatalogCount).toBe(0);
+  });
+
+  test("listForOrganization returns the description", async ({
+    makeOrganization,
+  }) => {
+    const org = await makeOrganization();
+    await EnvironmentModel.create({
+      organizationId: org.id,
+      name: "Sandbox",
+      description: "Throwaway environment",
+    });
+    const list = await EnvironmentModel.listForOrganization(org.id);
+    expect(list[0].description).toBe("Throwaway environment");
   });
 
   test("listForOrganization counts assigned catalog items per environment", async ({
@@ -102,6 +118,38 @@ describe("EnvironmentModel", () => {
     expect(updated?.namespace).toBe("stg");
     expect(updated?.name).toBe("Staging");
     expect(updated?.slug).toBe("staging");
+  });
+
+  test("update changes the description", async ({ makeOrganization }) => {
+    const org = await makeOrganization();
+    const env = await EnvironmentModel.create({
+      organizationId: org.id,
+      name: "Staging",
+      description: "Initial description",
+    });
+    const updated = await EnvironmentModel.update({
+      id: env.id,
+      organizationId: org.id,
+      description: "Updated description",
+    });
+    expect(updated?.description).toBe("Updated description");
+    expect(updated?.name).toBe("Staging");
+
+    // Omitting description leaves it unchanged.
+    const namespaceOnly = await EnvironmentModel.update({
+      id: env.id,
+      organizationId: org.id,
+      namespace: "stg",
+    });
+    expect(namespaceOnly?.description).toBe("Updated description");
+
+    // Explicit null clears it.
+    const cleared = await EnvironmentModel.update({
+      id: env.id,
+      organizationId: org.id,
+      description: null,
+    });
+    expect(cleared?.description).toBeNull();
   });
 
   test("delete removes the row", async ({ makeOrganization }) => {

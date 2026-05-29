@@ -69,15 +69,25 @@ describe("PATCH /api/organization/default-environment", () => {
     const res = await app.inject({
       method: "PATCH",
       url: "/api/organization/default-environment",
-      payload: { name: "Primary", namespace: "primary-ns" },
+      payload: {
+        name: "Primary",
+        description: "Primary deployment target",
+        namespace: "primary-ns",
+      },
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().defaultEnvironmentName).toBe("Primary");
+    expect(res.json().defaultEnvironmentDescription).toBe(
+      "Primary deployment target",
+    );
     expect(res.json().defaultEnvironmentNamespace).toBe("primary-ns");
 
-    // Re-fetch the org to confirm both fields persisted.
+    // Re-fetch the org to confirm all fields persisted.
     const reloaded = await OrganizationModel.getById(organizationId);
     expect(reloaded?.defaultEnvironmentName).toBe("Primary");
+    expect(reloaded?.defaultEnvironmentDescription).toBe(
+      "Primary deployment target",
+    );
     expect(reloaded?.defaultEnvironmentNamespace).toBe("primary-ns");
   });
 
@@ -121,6 +131,50 @@ describe("PATCH /api/organization/default-environment", () => {
     expect(updateNamespace.json().defaultEnvironmentNamespace).toBe(
       "renamed-ns",
     );
+  });
+
+  test("persists description and leaves it unchanged when omitted", async ({
+    makeUser,
+    makeOrganization,
+  }) => {
+    vi.clearAllMocks();
+    mockHasPermission.mockResolvedValue({ success: true, error: null });
+    const user = await makeUser();
+    const organization = await makeOrganization();
+    organizationId = organization.id;
+    app = await buildApp(user, organizationId);
+
+    // Set the description.
+    const setDescription = await app.inject({
+      method: "PATCH",
+      url: "/api/organization/default-environment",
+      payload: { description: "Default target" },
+    });
+    expect(setDescription.statusCode).toBe(200);
+    expect(setDescription.json().defaultEnvironmentDescription).toBe(
+      "Default target",
+    );
+
+    // PATCH only name; description must be preserved.
+    const updateName = await app.inject({
+      method: "PATCH",
+      url: "/api/organization/default-environment",
+      payload: { name: "Renamed" },
+    });
+    expect(updateName.statusCode).toBe(200);
+    expect(updateName.json().defaultEnvironmentName).toBe("Renamed");
+    expect(updateName.json().defaultEnvironmentDescription).toBe(
+      "Default target",
+    );
+
+    // Explicit null clears it.
+    const clearDescription = await app.inject({
+      method: "PATCH",
+      url: "/api/organization/default-environment",
+      payload: { description: null },
+    });
+    expect(clearDescription.statusCode).toBe(200);
+    expect(clearDescription.json().defaultEnvironmentDescription).toBeNull();
   });
 
   test("explicit null clears a field", async ({

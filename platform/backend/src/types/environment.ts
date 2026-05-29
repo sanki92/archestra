@@ -19,14 +19,16 @@ export const EnvironmentWithAssignedCountSchema =
 
 export const CreateEnvironmentSchema = z.object({
   name: z.string().trim().min(1).max(50),
+  description: z.string().trim().max(500).nullable().optional(),
   namespace: z.string().trim().max(253).nullable().optional(),
 });
 
 /**
  * `name` and `slug` are immutable after creation (slug is a reserved permission
- * key). Only the namespace can change. Send `null` to clear it.
+ * key). The namespace and description can change. Send `null` to clear them.
  */
 export const UpdateEnvironmentSchema = z.object({
+  description: z.string().trim().max(500).nullable().optional(),
   namespace: z.string().trim().max(253).nullable().optional(),
 });
 

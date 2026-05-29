@@ -393,10 +393,14 @@ const organizationRoutes: FastifyPluginAsyncZod = async (fastify) => {
       // explicit null clears the column).
       const data: Partial<{
         defaultEnvironmentName: string | null;
+        defaultEnvironmentDescription: string | null;
         defaultEnvironmentNamespace: string | null;
       }> = {};
       if ("name" in body) {
         data.defaultEnvironmentName = body.name ?? null;
+      }
+      if ("description" in body) {
+        data.defaultEnvironmentDescription = body.description ?? null;
       }
       if ("namespace" in body) {
         data.defaultEnvironmentNamespace = body.namespace ?? null;

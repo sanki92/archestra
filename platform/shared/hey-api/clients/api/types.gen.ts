@@ -23196,6 +23196,7 @@ export type ListEnvironmentsResponses = {
         id: string;
         organizationId: string;
         name: string;
+        description: string | null;
         slug: string;
         namespace: string | null;
         sortOrder: number;
@@ -23210,6 +23211,7 @@ export type ListEnvironmentsResponse = ListEnvironmentsResponses[keyof ListEnvir
 export type CreateEnvironmentData = {
     body: {
         name: string;
+        description?: string | null;
         namespace?: string | null;
     };
     path?: never;
@@ -23290,6 +23292,7 @@ export type CreateEnvironmentResponses = {
         id: string;
         organizationId: string;
         name: string;
+        description: string | null;
         slug: string;
         namespace: string | null;
         sortOrder: number;
@@ -23387,6 +23390,7 @@ export type DeleteEnvironmentResponse = DeleteEnvironmentResponses[keyof DeleteE
 
 export type UpdateEnvironmentData = {
     body: {
+        description?: string | null;
         namespace?: string | null;
     };
     path: {
@@ -23469,6 +23473,7 @@ export type UpdateEnvironmentResponses = {
         id: string;
         organizationId: string;
         name: string;
+        description: string | null;
         slug: string;
         namespace: string | null;
         sortOrder: number;
@@ -30115,7 +30120,6 @@ export type UpdateInternalMcpCatalogItemData = {
             [key: string]: UserConfigFieldDefaultInput;
         };
         presetSecretId?: string | null;
-        environmentId?: string | null;
         catalogReinstallRequired?: boolean;
         labels?: Array<{
             key: string;
@@ -44022,6 +44026,7 @@ export type GetOrganizationResponses = {
         presetEntityDefaultLabel: string | null;
         defaultEnvironmentName: string | null;
         defaultEnvironmentNamespace: string | null;
+        defaultEnvironmentDescription: string | null;
         skillToolsEnabled: boolean;
         skillSlashCommandsEnabled: boolean;
         presetEntityDefaultValidationRegex: string | null;
@@ -44305,6 +44310,7 @@ export type UpdateAppearanceSettingsResponses = {
         presetEntityDefaultLabel: string | null;
         defaultEnvironmentName: string | null;
         defaultEnvironmentNamespace: string | null;
+        defaultEnvironmentDescription: string | null;
         skillToolsEnabled: boolean;
         skillSlashCommandsEnabled: boolean;
         presetEntityDefaultValidationRegex: string | null;
@@ -44459,6 +44465,7 @@ export type UpdateSecuritySettingsResponses = {
         presetEntityDefaultLabel: string | null;
         defaultEnvironmentName: string | null;
         defaultEnvironmentNamespace: string | null;
+        defaultEnvironmentDescription: string | null;
         skillToolsEnabled: boolean;
         skillSlashCommandsEnabled: boolean;
         presetEntityDefaultValidationRegex: string | null;
@@ -44616,6 +44623,7 @@ export type UpdateLlmSettingsResponses = {
         presetEntityDefaultLabel: string | null;
         defaultEnvironmentName: string | null;
         defaultEnvironmentNamespace: string | null;
+        defaultEnvironmentDescription: string | null;
         skillToolsEnabled: boolean;
         skillSlashCommandsEnabled: boolean;
         presetEntityDefaultValidationRegex: string | null;
@@ -44772,6 +44780,7 @@ export type UpdateAgentSettingsResponses = {
         presetEntityDefaultLabel: string | null;
         defaultEnvironmentName: string | null;
         defaultEnvironmentNamespace: string | null;
+        defaultEnvironmentDescription: string | null;
         skillToolsEnabled: boolean;
         skillSlashCommandsEnabled: boolean;
         presetEntityDefaultValidationRegex: string | null;
@@ -44935,6 +44944,7 @@ export type UpdateConnectionSettingsResponses = {
         presetEntityDefaultLabel: string | null;
         defaultEnvironmentName: string | null;
         defaultEnvironmentNamespace: string | null;
+        defaultEnvironmentDescription: string | null;
         skillToolsEnabled: boolean;
         skillSlashCommandsEnabled: boolean;
         presetEntityDefaultValidationRegex: string | null;
@@ -45089,6 +45099,7 @@ export type UpdatePresetEntityNameResponses = {
         presetEntityDefaultLabel: string | null;
         defaultEnvironmentName: string | null;
         defaultEnvironmentNamespace: string | null;
+        defaultEnvironmentDescription: string | null;
         skillToolsEnabled: boolean;
         skillSlashCommandsEnabled: boolean;
         presetEntityDefaultValidationRegex: string | null;
@@ -45242,6 +45253,7 @@ export type UpdatePresetEntityDefaultLabelResponses = {
         presetEntityDefaultLabel: string | null;
         defaultEnvironmentName: string | null;
         defaultEnvironmentNamespace: string | null;
+        defaultEnvironmentDescription: string | null;
         skillToolsEnabled: boolean;
         skillSlashCommandsEnabled: boolean;
         presetEntityDefaultValidationRegex: string | null;
@@ -45395,6 +45407,7 @@ export type UpdatePresetEntityDefaultValidationRegexResponses = {
         presetEntityDefaultLabel: string | null;
         defaultEnvironmentName: string | null;
         defaultEnvironmentNamespace: string | null;
+        defaultEnvironmentDescription: string | null;
         skillToolsEnabled: boolean;
         skillSlashCommandsEnabled: boolean;
         presetEntityDefaultValidationRegex: string | null;
@@ -45406,6 +45419,7 @@ export type UpdatePresetEntityDefaultValidationRegexResponse = UpdatePresetEntit
 export type UpdateDefaultEnvironmentData = {
     body: {
         name?: string | null;
+        description?: string | null;
         namespace?: string | null;
     };
     path?: never;
@@ -45549,6 +45563,7 @@ export type UpdateDefaultEnvironmentResponses = {
         presetEntityDefaultLabel: string | null;
         defaultEnvironmentName: string | null;
         defaultEnvironmentNamespace: string | null;
+        defaultEnvironmentDescription: string | null;
         skillToolsEnabled: boolean;
         skillSlashCommandsEnabled: boolean;
         presetEntityDefaultValidationRegex: string | null;
@@ -45703,6 +45718,7 @@ export type UpdateAuthSettingsResponses = {
         presetEntityDefaultLabel: string | null;
         defaultEnvironmentName: string | null;
         defaultEnvironmentNamespace: string | null;
+        defaultEnvironmentDescription: string | null;
         skillToolsEnabled: boolean;
         skillSlashCommandsEnabled: boolean;
         presetEntityDefaultValidationRegex: string | null;
@@ -45859,6 +45875,7 @@ export type UpdateKnowledgeSettingsResponses = {
         presetEntityDefaultLabel: string | null;
         defaultEnvironmentName: string | null;
         defaultEnvironmentNamespace: string | null;
+        defaultEnvironmentDescription: string | null;
         skillToolsEnabled: boolean;
         skillSlashCommandsEnabled: boolean;
         presetEntityDefaultValidationRegex: string | null;
@@ -46010,6 +46027,7 @@ export type DropEmbeddingConfigResponses = {
         presetEntityDefaultLabel: string | null;
         defaultEnvironmentName: string | null;
         defaultEnvironmentNamespace: string | null;
+        defaultEnvironmentDescription: string | null;
         skillToolsEnabled: boolean;
         skillSlashCommandsEnabled: boolean;
         presetEntityDefaultValidationRegex: string | null;
@@ -46250,6 +46268,7 @@ export type CompleteOnboardingResponses = {
         presetEntityDefaultLabel: string | null;
         defaultEnvironmentName: string | null;
         defaultEnvironmentNamespace: string | null;
+        defaultEnvironmentDescription: string | null;
         skillToolsEnabled: boolean;
         skillSlashCommandsEnabled: boolean;
         presetEntityDefaultValidationRegex: string | null;

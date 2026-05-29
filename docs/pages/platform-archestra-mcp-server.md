@@ -467,7 +467,6 @@ Required RBAC permission: `mcpRegistry:update`
 | `labels[].key` | `string` | Yes | Label key. |
 | `labels[].value` | `string` | Yes | Label value. |
 | `teams` | `string[]` | No | Team IDs for team-scoped access control. |
-| `environmentId` | `string \| null` | No | ID of the environment this server belongs to. Omit (or pass null) to leave it in the default environment. |
 
 
 #### edit_mcp_config

@@ -23,6 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import {
   type EnvironmentWithAssignedCount,
   useCreateEnvironment,
@@ -64,6 +65,7 @@ export function EnvironmentsSection({ canEdit }: { canEdit: boolean }) {
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
+              <TableHead>Description</TableHead>
               <TableHead>Kubernetes namespace</TableHead>
               <TableHead>Assigned items</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -77,6 +79,9 @@ export function EnvironmentsSection({ canEdit }: { canEdit: boolean }) {
             <TableRow>
               <TableCell className="font-medium">
                 {defaultEnvironment.name}
+              </TableCell>
+              <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
+                {defaultEnvironment.description ?? "—"}
               </TableCell>
               <TableCell className="font-mono text-xs text-muted-foreground">
                 {defaultEnvironment.namespace ?? "—"}
@@ -98,7 +103,7 @@ export function EnvironmentsSection({ canEdit }: { canEdit: boolean }) {
             {isLoading ? (
               <TableRow>
                 <TableCell
-                  colSpan={4}
+                  colSpan={5}
                   className="text-center text-sm text-muted-foreground"
                 >
                   Loading…
@@ -109,6 +114,9 @@ export function EnvironmentsSection({ canEdit }: { canEdit: boolean }) {
                 <TableRow key={environment.id}>
                   <TableCell className="font-medium">
                     {environment.name}
+                  </TableCell>
+                  <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
+                    {environment.description ?? "—"}
                   </TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">
                     {environment.namespace ?? "—"}
@@ -189,7 +197,11 @@ function EnvironmentEditorDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   environment: EnvironmentWithAssignedCount | null;
-  defaultEnvironment?: { name: string; namespace: string | null };
+  defaultEnvironment?: {
+    name: string;
+    namespace: string | null;
+    description: string | null;
+  };
 }) {
   const createMutation = useCreateEnvironment();
   const updateMutation = useUpdateEnvironment();
@@ -200,6 +212,7 @@ function EnvironmentEditorDialog({
 
   const [name, setName] = useState("");
   const [namespace, setNamespace] = useState("");
+  const [description, setDescription] = useState("");
 
   // The default's name is freely editable; real environments lock it on edit.
   const nameEditable = mode !== "edit";
@@ -210,9 +223,11 @@ function EnvironmentEditorDialog({
       if (mode === "default") {
         setName(defaultEnvironment?.name ?? "");
         setNamespace(defaultEnvironment?.namespace ?? "");
+        setDescription(defaultEnvironment?.description ?? "");
       } else {
         setName(environment?.name ?? "");
         setNamespace(environment?.namespace ?? "");
+        setDescription(environment?.description ?? "");
       }
     }
   }, [open, mode, environment, defaultEnvironment]);
@@ -223,14 +238,20 @@ function EnvironmentEditorDialog({
     updateDefaultMutation.isPending;
   const trimmedName = name.trim();
   const trimmedNamespace = namespace.trim();
+  const trimmedDescription = description.trim();
   const canSave = mode === "edit" ? true : trimmedName.length > 0;
 
   const handleSave = () => {
+    const namespaceValue = trimmedNamespace === "" ? null : trimmedNamespace;
+    const descriptionValue =
+      trimmedDescription === "" ? null : trimmedDescription;
+
     if (mode === "create") {
       createMutation.mutate(
         {
           name: trimmedName,
-          namespace: trimmedNamespace === "" ? null : trimmedNamespace,
+          namespace: namespaceValue,
+          description: descriptionValue,
         },
         { onSuccess: (created) => created && onOpenChange(false) },
       );
@@ -238,7 +259,8 @@ function EnvironmentEditorDialog({
       updateDefaultMutation.mutate(
         {
           name: trimmedName,
-          namespace: trimmedNamespace === "" ? null : trimmedNamespace,
+          namespace: namespaceValue,
+          description: descriptionValue,
         },
         { onSuccess: (updated) => updated && onOpenChange(false) },
       );
@@ -247,7 +269,8 @@ function EnvironmentEditorDialog({
         {
           id: environment.id,
           body: {
-            namespace: trimmedNamespace === "" ? null : trimmedNamespace,
+            namespace: namespaceValue,
+            description: descriptionValue,
           },
         },
         { onSuccess: (updated) => updated && onOpenChange(false) },
@@ -294,6 +317,18 @@ function EnvironmentEditorDialog({
                 derived from it.
               </p>
             )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="environment-description">Description</Label>
+            <Textarea
+              id="environment-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="e.g. Production workloads in the EU region"
+              maxLength={500}
+              className="min-h-20"
+              disabled={isPending}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="environment-namespace">Kubernetes namespace</Label>

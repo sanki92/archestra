@@ -61,6 +61,7 @@ export function makeOrganization(
     presetEntityDefaultValidationRegex: null,
     defaultEnvironmentName: null,
     defaultEnvironmentNamespace: null,
+    defaultEnvironmentDescription: null,
     ...overrides,
   };
 }

@@ -27,6 +27,7 @@ export async function createEnvironment(params: {
   return EnvironmentModel.create({
     organizationId,
     name: data.name,
+    description: data.description ?? null,
     namespace: data.namespace ?? null,
   });
 }
@@ -40,6 +41,7 @@ export async function updateEnvironment(params: {
   const updated = await EnvironmentModel.update({
     id,
     organizationId,
+    description: data.description,
     namespace: data.namespace,
   });
   if (!updated) {

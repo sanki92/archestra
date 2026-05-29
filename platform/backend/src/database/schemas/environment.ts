@@ -25,6 +25,8 @@ const environmentsTable = pgTable(
       .notNull()
       .references(() => organizationsTable.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    /** Optional human-readable description, shown in the environment selector. */
+    description: text("description"),
     slug: text("slug").notNull(),
     /**
      * Target Kubernetes namespace for servers in this environment. Stored only;
