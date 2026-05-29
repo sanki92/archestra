@@ -6,6 +6,10 @@ packages:
   - "e2e-tests"
 
 catalog:
+  better-auth: 1.6.5
+  "@better-auth/core": 1.6.5
+  "@better-auth/oauth-provider": 1.6.5
+  "@better-auth/sso": 1.6.5
   typescript: ^6.0.2
   # TS 7 beta (Go-based `tsgo`) publishes daily dev builds. The
   # minimumReleaseAge setting below blocks anything newer than 7 days. Pinning the
