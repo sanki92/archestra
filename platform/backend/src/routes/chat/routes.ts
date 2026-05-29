@@ -16,6 +16,7 @@ import {
   generateId,
   generateText,
   hasToolCall,
+  NoSuchToolError,
   stepCountIs,
   streamText,
   type UIMessage,
@@ -154,6 +155,17 @@ function getMinimalFrontendError(errorForFrontend: ChatErrorResponse) {
     ...(errorForFrontend.spanId ? { spanId: errorForFrontend.spanId } : {}),
   };
 }
+
+const UNAVAILABLE_TOOL_ERROR_MESSAGE =
+  "The requested tool is not available in this chat. Available tools are listed in the details below; use an exact available tool name for the next tool call.";
+
+type UnavailableToolErrorDetails = {
+  type: "unavailable_tool";
+  message: string;
+  requestedToolName: string;
+  availableToolNames: string[];
+  originalErrorMessage: string;
+};
 
 const chatRoutes: FastifyPluginAsyncZod = async (fastify) => {
   fastify.post(
@@ -500,6 +512,9 @@ const chatRoutes: FastifyPluginAsyncZod = async (fastify) => {
               // assistant messages instead of rendering duplicate ones.
               originalMessages: messages as UIMessage[],
               onError: (error) => {
+                // unlike the tool-level stream handler, a NoSuchToolError here
+                // is not a recoverable tool result: it must mark the run failed
+                // and persist, so it falls through to the normal error path.
                 activeRunError =
                   error instanceof Error ? error.message : String(error);
                 // Persist messages on stream-level errors (e.g. errors thrown
@@ -813,6 +828,21 @@ const chatRoutes: FastifyPluginAsyncZod = async (fastify) => {
                     // prompt on reload (#4030).
                     generateMessageId: generateId,
                     onError: (error) => {
+                      const unavailableToolError =
+                        getUnavailableToolErrorDetails(error);
+                      if (unavailableToolError) {
+                        logger.info(
+                          {
+                            conversationId,
+                            unavailableToolError,
+                          },
+                          "Returning unavailable tool error as tool-level error",
+                        );
+                        return formatUnavailableToolErrorDetails(
+                          unavailableToolError,
+                        );
+                      }
+
                       if (chatErrorHandled) {
                         return serializedChatError;
                       }
@@ -2436,6 +2466,37 @@ export async function generateConversationTitle(
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+function getUnavailableToolErrorDetails(
+  error: unknown,
+): UnavailableToolErrorDetails | null {
+  if (!NoSuchToolError.isInstance(error)) {
+    return null;
+  }
+
+  return {
+    type: "unavailable_tool",
+    message: UNAVAILABLE_TOOL_ERROR_MESSAGE,
+    requestedToolName: error.toolName,
+    availableToolNames: error.availableTools ?? [],
+    originalErrorMessage: error.message,
+  };
+}
+
+function formatUnavailableToolErrorDetails(
+  details: UnavailableToolErrorDetails,
+): string {
+  return `${details.message}\n\nDetails:\n${JSON.stringify(
+    {
+      type: details.type,
+      requestedToolName: details.requestedToolName,
+      availableToolNames: details.availableToolNames,
+      originalErrorMessage: details.originalErrorMessage,
+    },
+    null,
+    2,
+  )}`;
+}
 
 /**
  * Persists new messages to the database for a conversation.
