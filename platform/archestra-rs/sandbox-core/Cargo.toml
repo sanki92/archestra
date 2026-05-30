@@ -23,7 +23,7 @@ dagger-sdk = "=0.21.0"
 futures-util = "0.3"
 napi = { version = "3", optional = true }
 napi-derive = { version = "3", optional = true }
-opentelemetry = "0.27"
+opentelemetry = "0.32"
 opentelemetry_sdk = "0.27"
 # http/protobuf OTLP over rustls (musl-friendly, no system openssl), aimed at
 # the same collector the node SDK uses (port 4318).
