@@ -62,6 +62,42 @@ test("ignores edits for an unknown module", () => {
   expect(() => applyTransformEdit(flow, "missing", "expr", "x")).not.toThrow();
 });
 
+test("editing a previously-absent key defaults to a javascript transform", () => {
+  const flow = sampleFlow();
+  applyTransformEdit(flow, "a", "fresh", "flow_input.q");
+  const value = flow.value.modules[0]?.value;
+  if (value?.type === "script") {
+    expect(value.input_transforms?.fresh).toEqual({
+      type: "javascript",
+      expr: "flow_input.q",
+    });
+  }
+});
+
+test("editing a container module is a no-op", () => {
+  const flow: OpenFlow = {
+    summary: "s",
+    value: {
+      modules: [
+        {
+          id: "loop",
+          value: {
+            type: "forloopflow",
+            modules: [{ id: "inner", value: { type: "identity" } }],
+          },
+        },
+      ],
+    },
+  };
+  expect(() => applyTransformEdit(flow, "loop", "x", "y")).not.toThrow();
+  const value = flow.value.modules[0]?.value;
+  if (value?.type === "forloopflow") {
+    expect(value.modules).toEqual([
+      { id: "inner", value: { type: "identity" } },
+    ]);
+  }
+});
+
 test("parseMaybeJson falls back to the raw string", () => {
   expect(parseMaybeJson("12")).toBe(12);
   expect(parseMaybeJson("not json")).toBe("not json");

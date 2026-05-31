@@ -91,6 +91,9 @@ function buildControls(): HTMLElement {
 
   runButton.addEventListener("click", () =>
     withButton(runButton, output, "Running...", async () => {
+      if (!currentPath || !currentFlow) {
+        return "No flow loaded.";
+      }
       const result = await callTool("run_flow", { path: currentPath });
       return formatRunResult(result);
     }),
@@ -98,7 +101,16 @@ function buildControls(): HTMLElement {
 
   saveButton.addEventListener("click", () =>
     withButton(saveButton, output, "Saving...", async () => {
-      await callTool("update_flow", { path: currentPath, flow: currentFlow });
+      if (!currentPath || !currentFlow) {
+        return "No flow loaded.";
+      }
+      const result = await callTool("update_flow", {
+        path: currentPath,
+        flow: currentFlow,
+      });
+      if (result.isError) {
+        throw new Error(errorTextOf(result) || "Save failed");
+      }
       return "Saved.";
     }),
   );
@@ -148,10 +160,13 @@ function formatRunResult(result: CallToolResult): string {
   if (structured && "result" in structured) {
     return JSON.stringify(structured.result, null, 2);
   }
+  return errorTextOf(result) || "Done";
+}
+
+function errorTextOf(result: CallToolResult): string {
   const blocks = (result.content ?? []) as { type: string; text?: string }[];
-  const text = blocks
+  return blocks
     .filter((block) => block.type === "text" && typeof block.text === "string")
     .map((block) => block.text)
     .join("\n");
-  return text || "Done";
 }
