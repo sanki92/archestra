@@ -111,3 +111,38 @@ body {
   font-family: ui-monospace, monospace;
   word-break: break-word;
 }
+
+.controls {
+  margin-top: 16px;
+}
+
+.run-button {
+  border: 0;
+  border-radius: 6px;
+  background: var(--wm-accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.run-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.run-output:empty {
+  display: none;
+}
+
+.run-output {
+  margin: 12px 0 0;
+  padding: 12px;
+  border-radius: 6px;
+  background: var(--wm-surface);
+  border: 1px solid var(--wm-border);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
