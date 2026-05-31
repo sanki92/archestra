@@ -112,8 +112,50 @@ body {
   word-break: break-word;
 }
 
+.flow-title-input {
+  width: 100%;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--wm-text);
+  background: var(--wm-surface);
+  border: 1px solid var(--wm-border);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.input-edit {
+  width: 100%;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--wm-text);
+  background: var(--wm-bg);
+  border: 1px solid var(--wm-border);
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+
 .controls {
   margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.save-button {
+  border: 1px solid var(--wm-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wm-text);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.save-button:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .run-button {
@@ -137,7 +179,8 @@ body {
 }
 
 .run-output {
-  margin: 12px 0 0;
+  flex-basis: 100%;
+  margin: 4px 0 0;
   padding: 12px;
   border-radius: 6px;
   background: var(--wm-surface);

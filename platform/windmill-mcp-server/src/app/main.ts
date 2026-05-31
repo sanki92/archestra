@@ -7,7 +7,8 @@ import {
 } from "@modelcontextprotocol/ext-apps";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { OpenFlow } from "../openflow.js";
-import { renderFlow } from "./render.js";
+import { applyTransformEdit } from "./flow-edit.js";
+import { type FlowEditHandlers, renderFlow } from "./render.js";
 import "./styles.css";
 
 const root = document.getElementById("root");
@@ -15,6 +16,9 @@ if (!root) {
   throw new Error("missing #root element");
 }
 const host = root as HTMLElement;
+
+let currentPath: string | null = null;
+let currentFlow: OpenFlow | null = null;
 
 const app = new App({ name: "Windmill Flow Editor", version: "0.0.0" });
 
@@ -54,45 +58,87 @@ function showResult(result: CallToolResult): void {
   if (!data?.flow) {
     return;
   }
+  currentPath = data.path ?? null;
+  currentFlow = data.flow;
+
+  const handlers: FlowEditHandlers = {
+    onSummary: (summary) => {
+      if (currentFlow) {
+        currentFlow.summary = summary;
+      }
+    },
+    onTransform: (moduleId, key, rawValue) => {
+      if (currentFlow) {
+        applyTransformEdit(currentFlow, moduleId, key, rawValue);
+      }
+    },
+  };
+
   const view = document.createElement("div");
-  view.appendChild(renderFlow(data.flow));
-  if (data.path) {
-    view.appendChild(buildRunControls(data.path));
-  }
+  view.appendChild(renderFlow(data.flow, handlers));
+  view.appendChild(buildControls());
   host.replaceChildren(view);
 }
 
-function buildRunControls(flowPath: string): HTMLElement {
+function buildControls(): HTMLElement {
   const bar = document.createElement("div");
   bar.className = "controls";
 
-  const button = document.createElement("button");
-  button.className = "run-button";
-  button.type = "button";
-  button.textContent = "Run flow";
-
+  const runButton = actionButton("Run flow", "run-button");
+  const saveButton = actionButton("Save changes", "save-button");
   const output = document.createElement("pre");
   output.className = "run-output";
 
-  button.addEventListener("click", async () => {
-    button.disabled = true;
-    output.textContent = "Running...";
-    try {
-      const result = await app.callServerTool({
-        name: "run_flow",
-        arguments: { path: flowPath },
-      });
-      output.textContent = formatRunResult(result);
-    } catch (error) {
-      output.textContent = `Error: ${error instanceof Error ? error.message : String(error)}`;
-    } finally {
-      button.disabled = false;
-    }
-  });
+  runButton.addEventListener("click", () =>
+    withButton(runButton, output, "Running...", async () => {
+      const result = await callTool("run_flow", { path: currentPath });
+      return formatRunResult(result);
+    }),
+  );
 
-  bar.appendChild(button);
+  saveButton.addEventListener("click", () =>
+    withButton(saveButton, output, "Saving...", async () => {
+      await callTool("update_flow", { path: currentPath, flow: currentFlow });
+      return "Saved.";
+    }),
+  );
+
+  bar.appendChild(runButton);
+  bar.appendChild(saveButton);
   bar.appendChild(output);
   return bar;
+}
+
+async function withButton(
+  button: HTMLButtonElement,
+  output: HTMLElement,
+  pending: string,
+  action: () => Promise<string>,
+): Promise<void> {
+  button.disabled = true;
+  output.textContent = pending;
+  try {
+    output.textContent = await action();
+  } catch (error) {
+    output.textContent = `Error: ${error instanceof Error ? error.message : String(error)}`;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function callTool(
+  name: string,
+  args: Record<string, unknown>,
+): Promise<CallToolResult> {
+  return app.callServerTool({ name, arguments: args });
+}
+
+function actionButton(label: string, className: string): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.className = className;
+  button.type = "button";
+  button.textContent = label;
+  return button;
 }
 
 function formatRunResult(result: CallToolResult): string {
