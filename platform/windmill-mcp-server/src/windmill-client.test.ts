@@ -169,3 +169,35 @@ test("createFlow posts the flow body and returns the path", async () => {
     summary: "New flow",
   });
 });
+
+test("updateFlow posts to flows/update and returns the path", async () => {
+  const { fetchImpl, calls } = stubFetch("f/demo/example");
+  const path = await new WindmillClient(config, fetchImpl).updateFlow(
+    "f/demo/example",
+    {
+      summary: "Updated",
+      value: { modules: [{ id: "a", value: { type: "identity" } }] },
+    },
+  );
+
+  expect(path).toBe("f/demo/example");
+  expect(calls[0]?.url).toBe(
+    "https://wm.example.com/api/w/demo/flows/update/f/demo/example",
+  );
+  expect(calls[0]?.method).toBe("POST");
+  expect(JSON.parse(calls[0]?.body ?? "{}")).toMatchObject({
+    path: "f/demo/example",
+    summary: "Updated",
+  });
+});
+
+test("updateFlow rejects an invalid path before making a request", async () => {
+  const { fetchImpl, calls } = stubFetch("ok");
+  await expect(
+    new WindmillClient(config, fetchImpl).updateFlow("../escape", {
+      summary: "x",
+      value: { modules: [] },
+    }),
+  ).rejects.toThrow(/Invalid flow path/);
+  expect(calls.length).toBe(0);
+});

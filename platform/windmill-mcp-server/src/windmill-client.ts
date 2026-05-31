@@ -64,16 +64,30 @@ export class WindmillClient {
     validateFlowPath(flowPath);
     await this.request("flows/create", {
       method: "POST",
-      body: {
-        path: flowPath,
-        summary: flow.summary,
-        description: flow.description,
-        value: flow.value,
-        schema: flow.schema,
-      },
+      body: this.flowBody(flowPath, flow),
       allowNonJson: true,
     });
     return flowPath;
+  }
+
+  async updateFlow(flowPath: string, flow: OpenFlow): Promise<string> {
+    validateFlowPath(flowPath);
+    await this.request(`flows/update/${flowPath}`, {
+      method: "POST",
+      body: this.flowBody(flowPath, flow),
+      allowNonJson: true,
+    });
+    return flowPath;
+  }
+
+  private flowBody(flowPath: string, flow: OpenFlow): Record<string, unknown> {
+    return {
+      path: flowPath,
+      summary: flow.summary,
+      description: flow.description,
+      value: flow.value,
+      schema: flow.schema,
+    };
   }
 
   private async request(
