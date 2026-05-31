@@ -10,7 +10,9 @@ const config: WindmillConfig = {
 
 interface Call {
   url: string;
+  method: string;
   headers: Record<string, string>;
+  body?: string;
 }
 
 function stubFetch(
@@ -24,7 +26,9 @@ function stubFetch(
   ) => {
     calls.push({
       url: String(url),
+      method: init?.method ?? "GET",
       headers: (init?.headers ?? {}) as Record<string, string>,
+      body: typeof init?.body === "string" ? init.body : undefined,
     });
     const payload = typeof body === "string" ? body : JSON.stringify(body);
     return new Response(payload, { status });
@@ -106,4 +110,54 @@ test("listFlows drops entries without a path", async () => {
   const flows = await new WindmillClient(config, fetchImpl).listFlows();
 
   expect(flows).toEqual([{ path: "f/a", summary: undefined }]);
+});
+
+test("runFlow posts args to run_wait_result and returns the result", async () => {
+  const { fetchImpl, calls } = stubFetch({ ok: true });
+  const result = await new WindmillClient(config, fetchImpl).runFlow(
+    "f/demo/example",
+    { page_id: "123" },
+  );
+
+  expect(result).toEqual({ ok: true });
+  expect(calls[0]?.url).toBe(
+    "https://wm.example.com/api/w/demo/jobs/run_wait_result/f/f/demo/example",
+  );
+  expect(calls[0]?.method).toBe("POST");
+  expect(calls[0]?.body).toBe(JSON.stringify({ page_id: "123" }));
+});
+
+test("runFlow returns text when the result is not JSON", async () => {
+  const { fetchImpl } = stubFetch("done", 200);
+  const result = await new WindmillClient(config, fetchImpl).runFlow(
+    "f/demo/x",
+  );
+  expect(result).toBe("done");
+});
+
+test("runFlow rejects an invalid path before making a request", async () => {
+  const { fetchImpl, calls } = stubFetch({});
+  await expect(
+    new WindmillClient(config, fetchImpl).runFlow("f/x?token=evil"),
+  ).rejects.toThrow(/Invalid flow path/);
+  expect(calls.length).toBe(0);
+});
+
+test("createFlow posts the flow body and returns the path", async () => {
+  const { fetchImpl, calls } = stubFetch("f/demo/new");
+  const path = await new WindmillClient(config, fetchImpl).createFlow(
+    "f/demo/new",
+    {
+      summary: "New flow",
+      value: { modules: [{ id: "a", value: { type: "identity" } }] },
+    },
+  );
+
+  expect(path).toBe("f/demo/new");
+  expect(calls[0]?.url).toBe("https://wm.example.com/api/w/demo/flows/create");
+  expect(calls[0]?.method).toBe("POST");
+  expect(JSON.parse(calls[0]?.body ?? "{}")).toMatchObject({
+    path: "f/demo/new",
+    summary: "New flow",
+  });
 });

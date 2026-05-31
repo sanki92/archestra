@@ -6,6 +6,12 @@ export interface FlowListing {
   summary?: string;
 }
 
+interface RequestOptions {
+  method?: string;
+  body?: unknown;
+  allowNonJson?: boolean;
+}
+
 export class WindmillClient {
   private readonly config: WindmillConfig;
   private readonly fetchImpl: typeof fetch;
@@ -37,21 +43,66 @@ export class WindmillClient {
       }));
   }
 
-  private async request(apiPath: string): Promise<unknown> {
-    const url = `${this.config.baseUrl}/api/w/${this.config.workspace}/${apiPath}`;
-    const response = await this.fetchImpl(url, {
-      headers: {
-        Authorization: `Bearer ${this.config.token}`,
-        Accept: "application/json",
-      },
+  async runFlow(
+    flowPath: string,
+    args: Record<string, unknown> = {},
+  ): Promise<unknown> {
+    validateFlowPath(flowPath);
+    return this.request(`jobs/run_wait_result/f/${flowPath}`, {
+      method: "POST",
+      body: args,
+      allowNonJson: true,
     });
+  }
+
+  async createFlow(flowPath: string, flow: OpenFlow): Promise<string> {
+    validateFlowPath(flowPath);
+    await this.request("flows/create", {
+      method: "POST",
+      body: {
+        path: flowPath,
+        summary: flow.summary,
+        description: flow.description,
+        value: flow.value,
+        schema: flow.schema,
+      },
+      allowNonJson: true,
+    });
+    return flowPath;
+  }
+
+  private async request(
+    apiPath: string,
+    options: RequestOptions = {},
+  ): Promise<unknown> {
+    const url = `${this.config.baseUrl}/api/w/${this.config.workspace}/${apiPath}`;
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${this.config.token}`,
+      Accept: "application/json",
+    };
+    if (options.body !== undefined) {
+      headers["Content-Type"] = "application/json";
+    }
+
+    const response = await this.fetchImpl(url, {
+      method: options.method ?? "GET",
+      headers,
+      body:
+        options.body === undefined ? undefined : JSON.stringify(options.body),
+    });
+
     if (!response.ok) {
       const body = await response.text().catch(() => "");
       throw new Error(`Windmill request failed (${response.status}): ${body}`);
     }
+
+    const text = await response.text();
     try {
-      return await response.json();
+      return JSON.parse(text);
     } catch {
+      if (options.allowNonJson) {
+        return text;
+      }
       throw new Error(`Windmill returned a non-JSON response from ${apiPath}`);
     }
   }
