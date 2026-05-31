@@ -129,6 +129,24 @@ test("create_flow creates a configured flow and returns the path", async () => {
   expect(path).toBe("f/team/new");
 });
 
+test("update_flow saves a configured flow and returns the path", async () => {
+  configureWindmill();
+  vi.stubGlobal(
+    "fetch",
+    async () => new Response('"f/team/live"', { status: 200 }),
+  );
+  const client = await connectClient();
+  const result = await client.callTool({
+    name: "update_flow",
+    arguments: {
+      path: "f/team/live",
+      flow: { summary: "Edited", value: { modules: [] } },
+    },
+  });
+  const { path } = result.structuredContent as { path: string };
+  expect(path).toBe("f/team/live");
+});
+
 test("serves the flow editor UI resource as mcp-app html", async () => {
   const client = await connectClient();
   const result = await client.readResource({ uri: FLOW_EDITOR_URI });

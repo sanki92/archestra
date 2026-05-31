@@ -215,6 +215,47 @@ export function createServer(): McpServer {
     },
   );
 
+  server.registerTool(
+    "update_flow",
+    {
+      title: "Update flow",
+      description: "Save changes to an existing Windmill flow.",
+      inputSchema: {
+        path: z.string().describe("Flow path, e.g. f/folder/my_flow"),
+        flow: flowInputSchema,
+      },
+      outputSchema: { path: z.string() },
+    },
+    async ({ path: flowPath, flow }): Promise<CallToolResult> => {
+      if (!config) {
+        return {
+          content: [{ type: "text", text: "Windmill is not configured." }],
+          isError: true,
+        };
+      }
+      try {
+        const updated = await new WindmillClient(config).updateFlow(
+          flowPath,
+          flow as OpenFlow,
+        );
+        return {
+          content: [{ type: "text", text: `Updated flow "${updated}"` }],
+          structuredContent: { path: updated },
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Could not update flow "${flowPath}": ${errorMessage(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
   registerAppResource(
     server,
     "Windmill flow editor",
