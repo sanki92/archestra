@@ -13,6 +13,7 @@ interface Call {
   method: string;
   headers: Record<string, string>;
   body?: string;
+  signal?: AbortSignal | null;
 }
 
 function stubFetch(
@@ -29,6 +30,7 @@ function stubFetch(
       method: init?.method ?? "GET",
       headers: (init?.headers ?? {}) as Record<string, string>,
       body: typeof init?.body === "string" ? init.body : undefined,
+      signal: init?.signal,
     });
     const payload = typeof body === "string" ? body : JSON.stringify(body);
     return new Response(payload, { status });
@@ -57,6 +59,12 @@ test("getFlow maps the Windmill response to an OpenFlow", async () => {
     "https://wm.example.com/api/w/demo/flows/get/f/demo/example",
   );
   expect(calls[0]?.headers.Authorization).toBe("Bearer secret-token");
+});
+
+test("getFlow sends a timeout abort signal", async () => {
+  const { fetchImpl, calls } = stubFetch(FLOW_RESPONSE);
+  await new WindmillClient(config, fetchImpl).getFlow("f/demo/example");
+  expect(calls[0]?.signal).toBeInstanceOf(AbortSignal);
 });
 
 test("getFlow throws on a non-ok response", async () => {

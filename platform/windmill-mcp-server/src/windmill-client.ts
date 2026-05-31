@@ -10,7 +10,11 @@ interface RequestOptions {
   method?: string;
   body?: unknown;
   allowNonJson?: boolean;
+  timeoutMs?: number;
 }
+
+const DEFAULT_TIMEOUT_MS = 30_000;
+const RUN_TIMEOUT_MS = 600_000;
 
 export class WindmillClient {
   private readonly config: WindmillConfig;
@@ -52,6 +56,7 @@ export class WindmillClient {
       method: "POST",
       body: args,
       allowNonJson: true,
+      timeoutMs: RUN_TIMEOUT_MS,
     });
   }
 
@@ -89,6 +94,7 @@ export class WindmillClient {
       headers,
       body:
         options.body === undefined ? undefined : JSON.stringify(options.body),
+      signal: AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS),
     });
 
     if (!response.ok) {
