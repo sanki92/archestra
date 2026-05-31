@@ -7,7 +7,7 @@
   "main": "dist/main.js",
   "scripts": {
     "build": "npm run build:ui && npm run build:server",
-    "build:ui": "cross-env INPUT=src/app/flow-editor.html vite build",
+    "build:ui": "vite build",
     "build:server": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
     "dev": "tsx watch src/main.ts",
@@ -25,7 +25,6 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.0",
     "@types/node": "^25.5.0",
-    "cross-env": "^10.1.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vite": "^6.0.0",
