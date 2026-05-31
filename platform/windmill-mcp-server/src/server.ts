@@ -9,7 +9,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { getWindmillConfig } from "./config.js";
-import { SAMPLE_FLOW } from "./openflow.js";
+import { type OpenFlow, SAMPLE_FLOW } from "./openflow.js";
 import { WindmillClient } from "./windmill-client.js";
 
 const FLOW_EDITOR_URI = "ui://windmill/flow-editor.html";
@@ -17,6 +17,21 @@ const FLOW_EDITOR_URI = "ui://windmill/flow-editor.html";
 const DIST_DIR = import.meta.filename.endsWith(".ts")
   ? path.join(import.meta.dirname, "..", "dist")
   : import.meta.dirname;
+
+const flowInputSchema = z.object({
+  summary: z.string(),
+  description: z.string().optional(),
+  value: z.object({
+    modules: z.array(
+      z.object({
+        id: z.string(),
+        value: z.record(z.string(), z.unknown()),
+        summary: z.string().optional(),
+      }),
+    ),
+  }),
+  schema: z.record(z.string(), z.unknown()).optional(),
+});
 
 export function createServer(): McpServer {
   const server = new McpServer({
@@ -107,6 +122,91 @@ export function createServer(): McpServer {
             {
               type: "text",
               text: `Could not list flows: ${errorMessage(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  server.registerTool(
+    "run_flow",
+    {
+      title: "Run flow",
+      description: "Run a Windmill flow and wait for its result.",
+      inputSchema: {
+        path: z.string().describe("Flow path, e.g. f/folder/my_flow"),
+        args: z
+          .record(z.string(), z.unknown())
+          .optional()
+          .describe("Flow input arguments"),
+      },
+      outputSchema: { path: z.string(), result: z.unknown() },
+    },
+    async ({ path: flowPath, args }): Promise<CallToolResult> => {
+      if (!config) {
+        return {
+          content: [{ type: "text", text: "Windmill is not configured." }],
+          isError: true,
+        };
+      }
+      try {
+        const result = await new WindmillClient(config).runFlow(
+          flowPath,
+          args ?? {},
+        );
+        return {
+          content: [{ type: "text", text: `Ran "${flowPath}"` }],
+          structuredContent: { path: flowPath, result },
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Could not run flow "${flowPath}": ${errorMessage(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  server.registerTool(
+    "create_flow",
+    {
+      title: "Create flow",
+      description: "Create a Windmill flow from an OpenFlow definition.",
+      inputSchema: {
+        path: z.string().describe("Target flow path, e.g. f/folder/my_flow"),
+        flow: flowInputSchema,
+      },
+      outputSchema: { path: z.string() },
+    },
+    async ({ path: flowPath, flow }): Promise<CallToolResult> => {
+      if (!config) {
+        return {
+          content: [{ type: "text", text: "Windmill is not configured." }],
+          isError: true,
+        };
+      }
+      try {
+        const created = await new WindmillClient(config).createFlow(
+          flowPath,
+          flow as OpenFlow,
+        );
+        return {
+          content: [{ type: "text", text: `Created flow "${created}"` }],
+          structuredContent: { path: created },
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Could not create flow "${flowPath}": ${errorMessage(error)}`,
             },
           ],
           isError: true,

@@ -87,6 +87,48 @@ test("list_flows returns an empty list when unconfigured", async () => {
   expect(flows).toEqual([]);
 });
 
+test("run_flow returns an error when unconfigured", async () => {
+  const client = await connectClient();
+  const result = await client.callTool({
+    name: "run_flow",
+    arguments: { path: "f/team/live" },
+  });
+  expect(result.isError).toBe(true);
+});
+
+test("run_flow runs a configured flow and returns the result", async () => {
+  configureWindmill();
+  vi.stubGlobal(
+    "fetch",
+    async () => new Response(JSON.stringify({ ok: true }), { status: 200 }),
+  );
+  const client = await connectClient();
+  const result = await client.callTool({
+    name: "run_flow",
+    arguments: { path: "f/team/live", args: {} },
+  });
+  const { result: runResult } = result.structuredContent as { result: unknown };
+  expect(runResult).toEqual({ ok: true });
+});
+
+test("create_flow creates a configured flow and returns the path", async () => {
+  configureWindmill();
+  vi.stubGlobal(
+    "fetch",
+    async () => new Response('"f/team/new"', { status: 200 }),
+  );
+  const client = await connectClient();
+  const result = await client.callTool({
+    name: "create_flow",
+    arguments: {
+      path: "f/team/new",
+      flow: { summary: "New", value: { modules: [] } },
+    },
+  });
+  const { path } = result.structuredContent as { path: string };
+  expect(path).toBe("f/team/new");
+});
+
 test("serves the flow editor UI resource as mcp-app html", async () => {
   const client = await connectClient();
   const result = await client.readResource({ uri: FLOW_EDITOR_URI });
