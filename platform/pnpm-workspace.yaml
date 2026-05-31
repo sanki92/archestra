@@ -4,7 +4,6 @@ packages:
   - "shared"
   - "archestra-rs/sandbox-rs"
   - "e2e-tests"
-  - "windmill-mcp-server"
 
 catalog:
   typescript: ^6.0.2
