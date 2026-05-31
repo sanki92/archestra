@@ -1,5 +1,6 @@
 import { ARCHESTRA_MCP_CATALOG_ID } from "./archestra-mcp-server";
 import { buildFullToolName, parseFullToolName } from "./utils";
+import { WINDMILL_MCP_CATALOG_ID } from "./windmill-mcp";
 
 /**
  * Fixed UUID for the Playwright browser preview MCP catalog entry.
@@ -19,6 +20,7 @@ export const PLAYWRIGHT_MCP_SERVER_NAME = buildFullToolName(
 export const BUILT_IN_CATALOG_IDS = new Set([
   ARCHESTRA_MCP_CATALOG_ID,
   PLAYWRIGHT_MCP_CATALOG_ID,
+  WINDMILL_MCP_CATALOG_ID,
 ]);
 
 export function isBuiltInCatalogId(id: string): boolean {

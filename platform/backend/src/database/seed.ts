@@ -14,6 +14,8 @@ import {
   type SupportedProvider,
   SupportedProviders,
   testMcpServerCommand,
+  WINDMILL_MCP_CATALOG_ID,
+  WINDMILL_MCP_SERVER_NAME,
 } from "@shared";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import config, { getProviderEnvApiKey } from "@/config";
@@ -291,6 +293,56 @@ async function seedPlaywrightCatalog(): Promise<void> {
     .onConflictDoNothing();
 
   logger.info("Seeded Playwright browser preview catalog");
+}
+
+async function seedWindmillCatalog(): Promise<void> {
+  const windmillLocalConfig = {
+    dockerImage:
+      "europe-west1-docker.pkg.dev/friendly-path-465518-r6/archestra-public/windmill-mcp-server:latest",
+    transportType: "streamable-http" as const,
+    command: "node",
+    arguments: ["dist/main.js"],
+    httpPort: 8080,
+    environment: [
+      {
+        key: "WINDMILL_BASE_URL",
+        type: "plain_text" as const,
+        promptOnInstallation: true,
+        required: true,
+        description:
+          "Base URL of the Windmill instance, e.g. https://app.windmill.dev",
+      },
+      {
+        key: "WINDMILL_WORKSPACE",
+        type: "plain_text" as const,
+        promptOnInstallation: true,
+        required: true,
+        description: "Windmill workspace id",
+      },
+      {
+        key: "WINDMILL_TOKEN",
+        type: "secret" as const,
+        promptOnInstallation: true,
+        required: true,
+        description: "Windmill API token",
+      },
+    ],
+  };
+
+  await db
+    .insert(schema.internalMcpCatalogTable)
+    .values({
+      id: WINDMILL_MCP_CATALOG_ID,
+      name: WINDMILL_MCP_SERVER_NAME,
+      description:
+        "Create, run, and edit Windmill flows as interactive MCP Apps",
+      serverType: "local",
+      requiresAuth: true,
+      localConfig: windmillLocalConfig,
+    })
+    .onConflictDoNothing();
+
+  logger.info("Seeded Windmill MCP catalog");
 }
 
 /**
@@ -612,6 +664,7 @@ export async function seedRequiredStartingData(): Promise<void> {
   await seedArchestraCatalogAndTools();
   await seedPlaywrightCatalog();
   await migratePlaywrightToolsToDynamicCredential();
+  await seedWindmillCatalog();
   await seedTestMcpServer();
   await seedTeamTokens();
   await seedChatApiKeysFromEnv();

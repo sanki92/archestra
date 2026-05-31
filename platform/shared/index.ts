@@ -50,3 +50,4 @@ export * from "./utils";
 export * from "./vault";
 export * from "./visibility";
 export * from "./websocket";
+export * from "./windmill-mcp";
