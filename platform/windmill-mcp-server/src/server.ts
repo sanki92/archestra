@@ -8,7 +8,9 @@ import {
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import { getWindmillConfig } from "./config.js";
 import { SAMPLE_FLOW } from "./openflow.js";
+import { WindmillClient } from "./windmill-client.js";
 
 const FLOW_EDITOR_URI = "ui://windmill/flow-editor.html";
 
@@ -21,6 +23,8 @@ export function createServer(): McpServer {
     name: "windmill",
     version: "0.0.0",
   });
+
+  const config = getWindmillConfig();
 
   registerAppTool(
     server,
@@ -35,17 +39,79 @@ export function createServer(): McpServer {
       outputSchema: { path: z.string(), flow: z.unknown() },
       _meta: { ui: { resourceUri: FLOW_EDITOR_URI } },
     },
-    ({ path: flowPath }): CallToolResult => {
-      const flow = SAMPLE_FLOW;
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Flow "${flow.summary}" with ${flow.value.modules.length} steps`,
-          },
-        ],
-        structuredContent: { path: flowPath, flow },
-      };
+    async ({ path: flowPath }): Promise<CallToolResult> => {
+      if (!config) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Windmill is not configured; showing sample flow "${SAMPLE_FLOW.summary}"`,
+            },
+          ],
+          structuredContent: { path: flowPath, flow: SAMPLE_FLOW },
+        };
+      }
+      try {
+        const flow = await new WindmillClient(config).getFlow(flowPath);
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Flow "${flow.summary}" with ${flow.value.modules.length} steps`,
+            },
+          ],
+          structuredContent: { path: flowPath, flow },
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Could not load flow "${flowPath}": ${errorMessage(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  server.registerTool(
+    "list_flows",
+    {
+      title: "List flows",
+      description: "List Windmill flows in the configured workspace.",
+      inputSchema: {},
+      outputSchema: {
+        flows: z.array(
+          z.object({ path: z.string(), summary: z.string().optional() }),
+        ),
+      },
+    },
+    async (): Promise<CallToolResult> => {
+      if (!config) {
+        return {
+          content: [{ type: "text", text: "Windmill is not configured." }],
+          structuredContent: { flows: [] },
+        };
+      }
+      try {
+        const flows = await new WindmillClient(config).listFlows();
+        return {
+          content: [{ type: "text", text: `${flows.length} flow(s)` }],
+          structuredContent: { flows },
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Could not list flows: ${errorMessage(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
     },
   );
 
@@ -80,4 +146,8 @@ async function readFlowEditorHtml(): Promise<string> {
     }
     throw error;
   }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
