@@ -81,13 +81,7 @@ export class WindmillClient {
   }
 
   private flowBody(flowPath: string, flow: OpenFlow): Record<string, unknown> {
-    return {
-      path: flowPath,
-      summary: flow.summary,
-      description: flow.description,
-      value: flow.value,
-      schema: flow.schema,
-    };
+    return { ...flow, path: flowPath } as Record<string, unknown>;
   }
 
   private async request(

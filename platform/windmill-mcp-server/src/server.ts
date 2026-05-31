@@ -18,12 +18,12 @@ const DIST_DIR = import.meta.filename.endsWith(".ts")
   ? path.join(import.meta.dirname, "..", "dist")
   : import.meta.dirname;
 
-const flowInputSchema = z.object({
+const flowInputSchema = z.looseObject({
   summary: z.string(),
   description: z.string().optional(),
-  value: z.object({
+  value: z.looseObject({
     modules: z.array(
-      z.object({
+      z.looseObject({
         id: z.string(),
         value: z.record(z.string(), z.unknown()),
         summary: z.string().optional(),
@@ -195,7 +195,7 @@ export function createServer(): McpServer {
       try {
         const created = await new WindmillClient(config).createFlow(
           flowPath,
-          flow as OpenFlow,
+          flow as unknown as OpenFlow,
         );
         return {
           content: [{ type: "text", text: `Created flow "${created}"` }],
@@ -236,7 +236,7 @@ export function createServer(): McpServer {
       try {
         const updated = await new WindmillClient(config).updateFlow(
           flowPath,
-          flow as OpenFlow,
+          flow as unknown as OpenFlow,
         );
         return {
           content: [{ type: "text", text: `Updated flow "${updated}"` }],

@@ -147,6 +147,64 @@ test("update_flow saves a configured flow and returns the path", async () => {
   expect(path).toBe("f/team/live");
 });
 
+test("update_flow preserves unknown OpenFlow fields end-to-end", async () => {
+  configureWindmill();
+  let captured: unknown;
+  vi.stubGlobal("fetch", async (_url: unknown, init?: { body?: unknown }) => {
+    captured = init?.body;
+    return new Response('"f/x"', { status: 200 });
+  });
+  const client = await connectClient();
+  const flow = {
+    summary: "Rich",
+    value: {
+      failure_module: { id: "fail", value: { type: "identity" } },
+      modules: [
+        {
+          id: "a",
+          value: { type: "script", path: "p" },
+          retry: { constant: { attempts: 2, seconds: 1 } },
+          suspend: { required_events: 1 },
+          stop_after_if: { expr: "true", skip_if_stopped: false },
+        },
+        {
+          id: "loop",
+          value: {
+            type: "forloopflow",
+            modules: [{ id: "inner", value: { type: "identity" } }],
+          },
+        },
+      ],
+    },
+  };
+  await client.callTool({
+    name: "update_flow",
+    arguments: { path: "f/team/live", flow },
+  });
+
+  const body = JSON.parse(captured as string) as {
+    value: {
+      failure_module?: unknown;
+      modules: {
+        retry?: unknown;
+        suspend?: unknown;
+        value: { modules?: unknown };
+      }[];
+    };
+  };
+  expect(body.value.failure_module).toEqual({
+    id: "fail",
+    value: { type: "identity" },
+  });
+  expect(body.value.modules[0]?.retry).toEqual({
+    constant: { attempts: 2, seconds: 1 },
+  });
+  expect(body.value.modules[0]?.suspend).toEqual({ required_events: 1 });
+  expect(body.value.modules[1]?.value.modules).toEqual([
+    { id: "inner", value: { type: "identity" } },
+  ]);
+});
+
 test("serves the flow editor UI resource as mcp-app html", async () => {
   const client = await connectClient();
   const result = await client.readResource({ uri: FLOW_EDITOR_URI });
