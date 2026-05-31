@@ -42,9 +42,15 @@ app.ontoolresult = showResult;
 app.onerror = (error) => console.error(error);
 app.onhostcontextchanged = applyHostContext;
 
-app.connect().then(() => {
-  const ctx = app.getHostContext();
-  if (ctx) {
-    applyHostContext(ctx);
-  }
-});
+app
+  .connect()
+  .then(() => {
+    const ctx = app.getHostContext();
+    if (ctx) {
+      applyHostContext(ctx);
+    }
+  })
+  .catch((error) => {
+    console.error(error);
+    (root as HTMLElement).textContent = "Could not connect to Archestra.";
+  });

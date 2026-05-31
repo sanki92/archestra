@@ -34,6 +34,11 @@ function renderNode(module: FlowModule, position: number): HTMLElement {
     item.appendChild(el("code", "node-target", target));
   }
 
+  const container = describeContainer(module);
+  if (container) {
+    item.appendChild(el("p", "node-container", container));
+  }
+
   const transforms = inputTransformsOf(module);
   if (transforms.length > 0) {
     const inputs = el("dl", "node-inputs");
@@ -58,6 +63,25 @@ function describeTarget(module: FlowModule): string | null {
   }
 }
 
+function describeContainer(module: FlowModule): string | null {
+  switch (module.value.type) {
+    case "forloopflow": {
+      const count = module.value.modules.length;
+      return `${count} ${count === 1 ? "step" : "steps"}`;
+    }
+    case "branchall": {
+      const count = module.value.branches.length;
+      return `${count} ${count === 1 ? "branch" : "branches"}`;
+    }
+    case "branchone": {
+      const count = module.value.branches.length + 1;
+      return `${count} ${count === 1 ? "branch" : "branches"}`;
+    }
+    default:
+      return null;
+  }
+}
+
 function inputTransformsOf(module: FlowModule): [string, InputTransform][] {
   if (module.value.type === "script" || module.value.type === "rawscript") {
     return Object.entries(module.value.input_transforms ?? {});
@@ -69,7 +93,7 @@ function describeTransform(transform: InputTransform): string {
   if (transform.type === "javascript") {
     return transform.expr;
   }
-  return JSON.stringify(transform.value);
+  return JSON.stringify(transform.value) ?? "null";
 }
 
 function el(tag: string, className: string, text?: string): HTMLElement {

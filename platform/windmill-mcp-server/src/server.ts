@@ -59,14 +59,25 @@ export function createServer(): McpServer {
         {
           uri: FLOW_EDITOR_URI,
           mimeType: RESOURCE_MIME_TYPE,
-          text: await fs.readFile(
-            path.join(DIST_DIR, "flow-editor.html"),
-            "utf-8",
-          ),
+          text: await readFlowEditorHtml(),
         },
       ],
     }),
   );
 
   return server;
+}
+
+async function readFlowEditorHtml(): Promise<string> {
+  try {
+    return await fs.readFile(path.join(DIST_DIR, "flow-editor.html"), "utf-8");
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error as NodeJS.ErrnoException).code === "ENOENT"
+    ) {
+      throw new Error("Flow editor UI bundle not found. Run: npm run build:ui");
+    }
+    throw error;
+  }
 }
