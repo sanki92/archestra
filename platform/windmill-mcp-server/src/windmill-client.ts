@@ -16,6 +16,7 @@ export class WindmillClient {
   }
 
   async getFlow(flowPath: string): Promise<OpenFlow> {
+    validateFlowPath(flowPath);
     const raw = await this.request(`flows/get/${flowPath}`);
     return toOpenFlow(raw);
   }
@@ -27,13 +28,13 @@ export class WindmillClient {
         "Unexpected Windmill response: flows/list did not return a list",
       );
     }
-    return raw.map((item) => {
-      const flow = item as { path?: unknown; summary?: unknown };
-      return {
-        path: String(flow.path ?? ""),
+    return raw
+      .map((item) => item as { path?: unknown; summary?: unknown })
+      .filter((flow) => typeof flow.path === "string" && flow.path.length > 0)
+      .map((flow) => ({
+        path: flow.path as string,
         summary: typeof flow.summary === "string" ? flow.summary : undefined,
-      };
-    });
+      }));
   }
 
   private async request(apiPath: string): Promise<unknown> {
@@ -48,7 +49,17 @@ export class WindmillClient {
       const body = await response.text().catch(() => "");
       throw new Error(`Windmill request failed (${response.status}): ${body}`);
     }
-    return response.json();
+    try {
+      return await response.json();
+    } catch {
+      throw new Error(`Windmill returned a non-JSON response from ${apiPath}`);
+    }
+  }
+}
+
+function validateFlowPath(flowPath: string): void {
+  if (!/^[A-Za-z0-9_/-]+$/.test(flowPath) || flowPath.includes("..")) {
+    throw new Error(`Invalid flow path: ${flowPath}`);
   }
 }
 

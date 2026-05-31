@@ -69,6 +69,21 @@ test("getFlow throws when the flow shape is unexpected", async () => {
   ).rejects.toThrow(/modules/);
 });
 
+test("getFlow rejects an invalid path before making a request", async () => {
+  const { fetchImpl, calls } = stubFetch(FLOW_RESPONSE);
+  await expect(
+    new WindmillClient(config, fetchImpl).getFlow("../../flows/list"),
+  ).rejects.toThrow(/Invalid flow path/);
+  expect(calls.length).toBe(0);
+});
+
+test("getFlow throws a clear error on a 200 non-JSON response", async () => {
+  const { fetchImpl } = stubFetch("<html>login</html>", 200);
+  await expect(
+    new WindmillClient(config, fetchImpl).getFlow("f/demo/example"),
+  ).rejects.toThrow(/non-JSON/);
+});
+
 test("listFlows maps path and summary", async () => {
   const { fetchImpl } = stubFetch([
     { path: "f/a", summary: "A" },
@@ -80,4 +95,15 @@ test("listFlows maps path and summary", async () => {
     { path: "f/a", summary: "A" },
     { path: "f/b", summary: undefined },
   ]);
+});
+
+test("listFlows drops entries without a path", async () => {
+  const { fetchImpl } = stubFetch([
+    { path: "f/a" },
+    { summary: "no path" },
+    { path: "" },
+  ]);
+  const flows = await new WindmillClient(config, fetchImpl).listFlows();
+
+  expect(flows).toEqual([{ path: "f/a", summary: undefined }]);
 });
